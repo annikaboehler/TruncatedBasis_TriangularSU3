@@ -380,7 +380,7 @@ class StringBasis:
                     lat1[site[0],site[1]]=True
                     lat1[site[0]+1,site[1]]=True
 
-                if (self.L_size*site[0]+site[1]+sl[0])%2==1: #bond upwards
+                if (self.L_size*site[0]+site[1]+sl[0])%2==1: #bond downwards
                     if lat1[site[0],site[1]] and lat1[site[0]+1,site[1]]:
                         lat1[site[0],site[1]]=False
                         lat1[site[0]+1,site[1]]=False

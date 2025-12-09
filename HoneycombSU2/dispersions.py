@@ -8,9 +8,9 @@ from HC_2_holes import StringBasis as basis_hc_2h
 
 
 #set system parameters
-l_sc = 8
+l_sc = 7
 initial_sl = 0
-l_cc = 8
+l_cc = 7
 n_bands = 6
 
 t = 1

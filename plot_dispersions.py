@@ -3,9 +3,9 @@ import matplotlib.pyplot as plt
 import sys
 
 #set system parameters
-l_sc = 8
+l_sc = 7
 initial_sl = 0
-l_cc = 8
+l_cc = 7
 
 t = 1
 j = 0.3
@@ -97,3 +97,4 @@ axs[1].grid()
 axs[1].set_xticks(xticks, xlabels, size=16)
 
 plt.savefig(f'results/figures/{system}_1D_bandstructure_GKMKpG_sc_depth={l_sc}_cc_depth={l_cc}_t={t}_j={j}.pdf', bbox_inches='tight')
+plt.show()
