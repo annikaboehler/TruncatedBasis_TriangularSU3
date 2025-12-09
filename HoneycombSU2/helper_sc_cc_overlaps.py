@@ -17,11 +17,11 @@ def plot_lat(state, ax=None, end=False, fig=None, axs=None):
     else:
         lat = state.astype(float)
     if not ax is None:
-        axs[ax].imshow(lat, vmin=0, vmax=1)
+        axs[ax].imshow(lat, vmin=0, vmax=1, cmap='RdPu')
         if end:
             plt.show()
     else:
-        plt.imshow(lat, vmin=0, vmax=1)
+        plt.imshow(lat, vmin=0, vmax=1, cmap='RdPu')
         plt.show()
 
 def index2momentum(i, Lx, Ly=0):
@@ -99,65 +99,6 @@ def init_lattices(l_max_sc, l_max_cc, l_max_sc_overlaps, j_perp_div_j=1., connec
     print(f'dim(H_cc) = {lat_cc.basis.length}')
 
     return lat_sc_1, lat_sc_2, lat_cc
-
-def compute_eigenvectors_all_momenta(Lx, j, j_perp, t2, lat_sc: basis_sc, lat_cc: basis_cc, Ly=0, p=-1):
-    '''
-    computes all necessary eigenvectors
-    ------------
-    ARGUMENTS:
-    L: int: size of momentum grid
-    j: float: spin coupling constant
-    lat_sc: Lat_sc: lattice class from truncted basis for the sc
-    lat_cc: Lat_cc: lattice class from truncted basis for the cc
-    p: int -1 or 1: parity of quasiparticles i.e. +1 for bosons and -1 for fermions
-    -------------
-    RETURNS:
-    None
-    '''
-    if Ly == 0:
-        Ly = Lx
-    v0 = True
-    mom_ind = np.indices((Lx, Ly))
-    mom = index2momentum(mom_ind, Lx, Ly)
-    k1 = mom
-    print(mom.shape)
-    vs_sc = []
-    vs_cc = []
-    for x in range(Lx):
-        for y in range(Ly):
-            lat_sc.compute_H(k1[:,x,y], 1., t2=t2, j=j)
-            v = lat_sc.eigenvec(0)
-            #n0 = find_l0_state(lat_sc) ?????????
-            #v = v * np.exp(-1j * np.angle(v[n0])) # fix phase (set phase of l=0 state to zero)
-            vs_sc.append(v)
-
-            lat_cc.compute_H(k1[:,x,y], 1., j, j_perp, p=p)
-            #v_cc = lat_cc.eigenvec(0, v0=v0) v0 ?????????
-            v_cc = lat_cc.eigenvec(0)
-            #v_cc = v_cc * np.exp(-1j * np.angle(v_cc[0])) # fix phase (set phase of l=0 state to zero)
-            vs_cc.append(v_cc)
-
-    vs_sc = np.array(vs_sc).reshape((Lx, Ly, lat_sc.basis.length))
-    vs_cc = np.array(vs_cc).reshape((Lx, Ly, len(lat_cc.representatives)))
-
-    lat_sc.vs = vs_sc
-    lat_cc.vs = vs_cc
-    print('computed eigenvectors')
-
-def compute_eigensys_all_momenta_exc(L, j, t2, n_sc, n_cc, lat_sc: basis_sc, lat_cc: basis_cc, p=-1):
-    '''
-    computes all necessary eigenvectors
-    ------------
-    ARGUMENTS:
-    L: int: size of momentum grid
-    j: float: spin coupling constant
-    lat_sc: Lat_sc: lattice class from truncted basis for the sc
-    lat_cc: Lat_cc: lattice class from truncted basis for the cc
-    p: int -1 or 1: parity of quasiparticles i.e +1 for bosons and -1 for fermions
-    -------------
-    RETURNS:
-    None
-    '''
     
 
 def add_holes_hc(state1, state2, hole_pos_2, lat_sc_1, lat_sc_2, lat_cc):
@@ -216,35 +157,56 @@ def add_holes_hc_hopping(state1, state2, hole_pos_2, lat_sc_1, lat_sc_2, lat_cc)
     RETURNS:
     state: dictionary with lat, hole_pos, seq: state of the 2 sc's in the format of Lat_cc
     '''
-    j_max = np.amax(np.abs(hole_pos_2))
+    j_max = lat_cc.depth + 2
     jy = hole_pos_2[0]
     jx = hole_pos_2[1]
     sl_0 = state1['sl']
     sl_1 = state2['sl']
     lat1 = state1['lat']
     lat2 = state2['lat']
-    
+    #print(j_max)
+    #print("lat1, lat2:", lat1.shape, lat2.shape)
     lat1 = np.pad(lat1, (j_max, j_max), 'constant', constant_values=False) #pads such that hole 1 sits at center
-    lat2 = np.pad(lat2, ((j_max + jy, j_max - jy), (j_max + jx, j_max - jx)), 'constant', constant_values=False) #pads such that hole 2 sites at jx,jy
-    
+    lat2 = np.pad(lat2, ((j_max +jy, j_max - jy), (j_max + jx, j_max - jx)), 'constant', constant_values=False) #pads such that hole 2 sites at jx,jy
+    #print("lat1, lat2:", lat1.shape, lat2.shape)
     lat = np.logical_xor(lat1, lat2)
-    # now crop lat so that it has the same dimension as lattices in Lat_cc
-    dx = lat_sc_1.depth + j_max - (lat_cc.depth+1) #make cc lattice one site bigger because need to include hoppings from unit cells at +/- a2
-    if dx > 0: #new lattice is too big, need to crop
-        count = np.count_nonzero(lat[0:dx,:]) + np.count_nonzero(lat[-dx:,:]) + np.count_nonzero(lat[:,0:dx]) + np.count_nonzero(lat[:,-dx:]) #count strings outside cropped region
-        if count > 0: #if strings outside, state not possible
-            return -1, -1
-        else:
-            lat = lat[dx:-dx, dx:-dx]
-    elif dx < 0:
-        lat = np.pad(lat, (-dx, -dx), 'constant', constant_values=False)
-    hole_pos = [np.ones((2,), dtype=int) * (lat_cc.depth + 2), np.ones((2,), dtype=int) * (lat_cc.depth + 2) + hole_pos_2] #holes at center and at hole_pos_2
+    #print("lat:", lat.shape)
+    if np.any(np.abs(np.array([jx,jy]))>lat_cc.depth+1):
+        state_phys = -1 #hole placed outside cc lattice
+    else:
+        # now crop lat so that it has the same dimension as lattices in Lat_cc
+        dx = lat_sc_1.depth + 2 #j_max - (lat_cc.depth)
+        if dx >= 0: #new lattice is too big, need to crop
+            count = np.count_nonzero(lat[0:dx,:]) + np.count_nonzero(lat[-dx:,:]) + np.count_nonzero(lat[:,0:dx]) + np.count_nonzero(lat[:,-dx:]) #count strings outside cropped region
+            if count > 0: #if strings outside, state not possible
+                state_phys = -1
+            else:
+                lat_phys = lat[dx:-dx, dx:-dx]
+                hole_pos_phys = [np.ones((2,), dtype=int) * (lat_cc.depth + 1), np.ones((2,), dtype=int) * (lat_cc.depth + 1) + hole_pos_2] #holes at center and at hole_pos_2
+                for x in hole_pos_phys:
+                    lat_phys[tuple(x)] = False #set hole positions to False (need to add sl here)
+                state_phys = {'lat': lat_phys, 'hole_pos': hole_pos_phys, 'sl': [sl_0, sl_1]}
+                
+        elif dx < 0:
+            lat_phys = np.pad(lat, (-dx, -dx), 'constant', constant_values=False)
+            hole_pos_phys = [np.ones((2,), dtype=int) * (lat_cc.depth + 1), np.ones((2,), dtype=int) * (lat_cc.depth + 1) + hole_pos_2] #holes at center and at hole_pos_2
+            for x in hole_pos_phys:
+                lat_phys[tuple(x)] = False #set hole positions to False (need to add sl here)
+            state_phys = {'lat': lat_phys, 'hole_pos': hole_pos_phys, 'sl': [sl_0, sl_1]}
+    
+    #state to work with is bigger
+    # if lat.shape[0]!= (2*(lat_cc.depth+3)+1):
+    #     print(lat.shape, (2*(lat_cc.depth+3)+1))
+    #     pad = 2*lat_cc.depth+7-lat.shape[0]
+    #     lat = np.pad(lat, (pad//2, pad//2), 'constant', constant_values=False)
+    large_depth = lat_sc_1.depth + j_max
+    hole_pos = [np.ones((2,), dtype=int) * (large_depth +1), np.ones((2,), dtype=int) * (large_depth+1) + hole_pos_2] #holes at center and at hole_pos_2
     for x in hole_pos:
         lat[tuple(x)] = False #set hole positions to False (need to add sl here)
     state = {'lat': lat, 'hole_pos': hole_pos, 'sl': [sl_0, sl_1]}
-    lat_phys = lat[1:-1, 1:-1]
-    state_phys = {'lat': lat_phys, 'hole_pos': hole_pos, 'sl': [sl_0, sl_1]}
+    
     return state, state_phys #this is now one site larger than lat_cc states at each axis!
+
 
 def crop_lattice(lat, depth_sc, depth_cc, hole_pos_2, sl):
     '''
@@ -397,112 +359,4 @@ def transform_hc_lattice_j_perp(lat_cc):
     
 
     return transformed_basis
-
-
-def overlap_all_momenta(j, L, t2, lat_sc_1, lat_sc_2, lat_cc, p=-1):
-    '''
-    Computes the overlap M_t'(k, p) = <psi_cc(k1+k2)|H_j|psi_sc(k1), psi_sc(k2)>
-    of the cc wavefunction at momentum k+p and H applied to (sc)^2 wavefunction with momenta k and p
-    in a L x L grid 
-    ------------
-    ARGUMENTS:
-    j: float: spin coupling constant
-    L : int: linear size of momentum grid
-    t2: float: next-neartest neighbor hopping constant t'
-    lat_sc: Lat_sc: lattice class from truncted basis for the sc
-    lat_cc: Lat_cc: lattice class from truncted basis for the cc
-    -------------
-    RETURNS:
-    |Ms|: array ph shape (L, L) of (float): absolute value of the overlaps
-    '''
-    mom_ind = np.indices((L,L))
-    mom = index2momentum(mom_ind, L)
-    k1 = mom.reshape((2, L, L, 1, 1)) #2 LxL grids: x momentum, y momentum
-    k2 = mom.reshape((2, 1, 1, L, L)) #2 LxL grids: x momentum, y momentum
-    k_plus_p_ind = sum_ind(mom_ind.reshape((2,L,L,1,1)), mom_ind.reshape((2,1,1,L,L)), L)
-
-    # vs_sc_1, vs_sc_2, v_cc = compute_eigenvectors(L, j, j_perp, t2, lat_sc, lat_cc)
-    vs_sc_1 = lat_sc_1.vs.reshape((L, L, 1, 1, lat_sc_1.basis.length))
-    vs_sc_2 = lat_sc_2.vs.reshape((1, 1, L, L, lat_sc_2.basis.length))
-    v_cc = lat_cc.vs
-
-    l_max = lat_cc.depth
-
-    transformed_basis = transform_hc_lattice_j_perp(lat_cc)
-
-    Ms = np.zeros((L, L, L, L))
-    for n1 in lat_sc_1.indices:
-        for n2 in lat_sc_2.indices:
-            state1 = lat_sc_1.bin_basis[n1]
-            state2 = lat_sc_2.bin_basis[n2]
-            lat1 = state1['lat']
-            lat2 = state2['lat']
-            sl1 = state1['sl']
-            sl2 = state2['sl']
-
-            # determine area in which the second hole can be placed to form a cc pair
-            temp = np.argwhere(lat1) - lat_sc_1.depth - 1
-            temp = np.concatenate((np.zeros((1,2), dtype=int), temp), axis=0)
-            lower_bound_1 = np.amin(temp, axis=0)
-            upper_bound_1 = np.amax(temp, axis=0)
-
-            temp = np.argwhere(lat2) - lat_sc_2.depth - 1
-            temp = np.concatenate((np.zeros((1,2), dtype=int), temp), axis=0)
-            lower_bound_2 = np.amin(temp, axis=0)
-            upper_bound_2 = np.amax(temp, axis=0)
-
-            j_min = np.maximum(lower_bound_1 - upper_bound_2 - 4, lower_bound_2 - l_max)
-            j_max = np.minimum(upper_bound_1 - lower_bound_2 + 4, l_max - upper_bound_2)
-
-            for jx in range(j_min[0], j_max[0] + 1):
-                for jy in range(j_min[1], j_max[1] + 1):
-                    if jx == 0 and jy == 0: #holes cannot be on same site
-                        continue
-                    if sl1 == sl2 and (jx + jy) % 2 != 0: #same sublattice, must be an even number fo sites apart
-                        continue
-                    if sl1 != sl2 and (jx + jy) % 2 == 0: #different sublattice, must be an odd number fo sites apart
-                        continue
-                    
-                    jy_hc = jy
-                    if sl1 != sl2:
-                        jy_hc += 2*(sl1-0.5)
-                    jx_hc = jx
-                    d_hc = np.array([jx_hc, jy_hc])
-                    r1, r2 = brick_to_hc_distance(d_hc)
-                    rx = np.sqrt(3)*r2 + np.sqrt(3)/2*r1
-                    ry = 3/2*r1
-
-                    # apply S ^(+)_i S^(+)_j on l.h.s. of expectation value, i.e.
-                    # <cc|SS
-                    state = add_holes_hc_test(n1, n2, np.array([jx, jy]), lat_sc_1, lat_sc_2, lat_cc)
-                    if type(state)==dict:
-                        found, _ = lat_cc.basis.search(lat_cc.state_2_list_entry(state))
-                    else:
-                        found = False
-                    if not found:
-                        if type(state)== dict:
-                            found, m_t = transformed_basis.search(lat_cc.state_2_list_entry(state))
-                            if found:
-                                ms = transformed_basis.list[m_t][lat_cc.L_size + 2:]
-                                for m in ms: #can more than one state lead to same transformed state?
-                                    repr, _, m = lat_cc.is_representative[m]
-                                    dM = 0.5 * 1/np.sqrt(2) * np.conj(v_cc[k_plus_p_ind[0,:,:,:,:], k_plus_p_ind[1,:,:,:,:], m]) * vs_sc_1[:,:,:,:,n1] * vs_sc_2[:,:,:,:,n2] * np.exp(1j * np.einsum('nabcd,n->abcd', k2, np.array([rx, ry])))
-                                    # factor 1/sqrt(2) comes from projection onto fermionic states
-                                    # factor 1/2 comes from H_J_perp
-                                    if not repr:
-                                        dM *= -1 * np.exp(-1j * np.einsum('nabcd,n->abcd', k1 + k2, np.array([jx, jy])))
-                                    Ms = Ms + dM
-                        # apply S ^(-)_i S^(-)_j on r.h.s. of expectation value, i.e.
-                        # SS|(sc)^2>
-                        ms = add_holes_j_perp(n1, n2, np.array([jx, jy]), lat_sc_1, lat_sc_2, lat_cc)
-                        for m in ms:
-                            repr, _, m = lat_cc.is_representative[m]
-                            dM = 0.5 * 1/np.sqrt(2) * np.conj(v_cc[k_plus_p_ind[0,:,:,:,:], k_plus_p_ind[1,:,:,:,:], m]) * vs_sc_1[:,:,:,:,n1] * vs_sc_2[:,:,:,:,n2] * np.exp(1j * np.einsum('nabcd,n->abcd', k2, np.array([rx, ry])))
-                            # factor 1/sqrt(2) comes from projection onto fermionic states
-                            # factor 1/2 comes from H_J_perp
-                            if not repr:
-                                dM *= p * np.exp(-1j * np.einsum('nabcd,n->abcd', k1 + k2, np.array([rx, ry])))
-                            Ms = Ms + dM
-    Ms_j = np.pad(Ms, (0,1), mode='wrap')
-    return np.real_if_close(Ms_j)
 
