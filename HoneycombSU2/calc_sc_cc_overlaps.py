@@ -452,4 +452,3 @@ axs[1,1].set_xlabel("$k_x$")
 fig.colorbar(im4, ax=axs[1,1])
 plt.savefig("../results/figures/M_jperp_depth_sc="+str(l_sc)+"_depth_cc="+str(l_cc)+"_lmax_sc_overlaps="+str(l_max_sc_overlaps)+"_jperp="+str(j_perp)+"_j="+str(j)+"_t="+str(t)+".pdf", bbox_inches='tight')
 plt.show()
-

@@ -1,4 +1,4 @@
-#red hole
+# SU(3) triangular Linus 
 import numpy as np
 import copy
 from scipy.sparse.linalg import eigsh
@@ -81,14 +81,17 @@ class StringBasis:
         self.honeycomb = honeycomb
         self.big_unit_cell = big_unit_cell
         self.only_connected = only_connected
-        
-        
+
+
         self.tol = 0
 
         self.triangular_Neel()
         self.generate_basis()
         self.order_basis()
         #self.matrix_el()
+
+        self.data_t_test = []
+        self.data = []
 
     def triangular_Neel(self):
         # generates the three possible neel states (center site = 0,1,2 i.e red, green, blue) and saves them to list, because they are needed often
@@ -113,7 +116,7 @@ class StringBasis:
         sublattice = self.Neel_state[y]
         return sublattice
     
-    def find_hole_sublattice(self,seq):      #linus 1.0
+    def find_hole_sublattice(self,seq):    #linus 1.0
         x = np.sum(np.array(seq), axis=0, dtype=int)
         x = (np.sum(x)+1)%3
         return x
@@ -127,25 +130,25 @@ class StringBasis:
             innit = True
         return innit
     
-    def dist_2_uc_dist(self,dist,seq):   #transforms distance on the square lattice into distance between corresponding unit cells
+    def dist_2_uc_dist_annika(self,dist,seq):   #transforms distance on the square lattice into distance between corresponding unit cells
         dist1 = dist.copy()
         ## Honeycomb
         if self.honeycomb and self.big_unit_cell:
             x = np.sum(np.array(dist1))
             if x % 3 == 1:
-                dist1[0] += -1
+                dist1[1] += -1
             elif x % 3 == 2:
-                dist1[0] += 1
+                dist1[1] += 1
         elif not self.honeycomb and self.big_unit_cell:
             z = np.sum(np.array(seq), axis=0, dtype=int)
-            z = (-np.sum(z)-1)%3
+            z = (-np.sum(z))%3
             x,y = dist1[0]%3, dist1[1]%3
-            dist1[0] += (z-x-y)%3-z
+            dist1[1] += (z-x-y)%3-z
         return dist1
     
     def dist_2_phys_dist(self,dist,seq):   #transforms square lattice with one diagonal coupling to triangular lattice (i,j) = (sqrt(3)/2*i, j - 1/2*i)
         phys_dist = np.zeros(2)
-        dist = self.dist_2_uc_dist(dist,seq)
+        dist = self.dist_2_uc_dist_annika(dist,seq)
         phys_dist[0], phys_dist[1] = np.sqrt(3)/2*dist[0], dist[1] - 1/2*dist[0]
         return phys_dist
 
@@ -232,7 +235,7 @@ class StringBasis:
         check = new and physical
         if check:
             self.bin_basis.append(state)  #maybe better to put states in bins, divided into their sublattices
-
+                    
     def make_step(self, lat, step):  #done
         # lat = 2D boolean array with spin configurations (holes are False)
         # step = [x, y] gives the hopping
@@ -274,7 +277,7 @@ class StringBasis:
 
             self.basis.add(self.state_2_list_entry(state0) + [self.basis.length])
             self.bin_basis.append(state0)
-            
+
 
             l = 0
             n0 = 0
@@ -309,21 +312,6 @@ class StringBasis:
     def matrix_el(self):    #should I include j_z & j_perp?
     # compute matrix element of t-J-Hamiltonian up to a shift = energy of undoped Neel configuration
         ### use scipy.sparse matrix instead of np.array to reduce memory usage
-        # self.col_tx = []
-        # self.row_tx = []
-        # self.data_tx = []
-        # self.col_ty = []
-        # self.row_ty = []
-        # self.data_ty = []
-        # self.col_tdiag = []
-        # self.row_tdiag = []
-        # self.data_tdiag = []
-        # self.col_j0 = []
-        # self.row_j0 = []
-        # self.data_j0 = []
-        # self.col_j2 = []
-        # self.row_j2 = []
-        # self.data_j2 = []
 
         self.col_t = []
         self.row_t = []
@@ -340,14 +328,9 @@ class StringBasis:
         self.data_j_perp = []
         self.col_j_perp = []
         self.row_j_perp = []
-        if self.honeycomb == False:
-            steps = [np.array([1, 0]), np.array([0, 1]), np.array([1, 1])]
-            steps2 = [np.array([1, 2]), np.array([2, 1]), np.array([1, -1])] 
-        else:
-            steps = [np.array([1, 0]), np.array([0, 1]), np.array([1, 1]), 
-                     np.array([-1, 0]), np.array([0, -1]), np.array([-1, -1])] 
-            steps2 = [np.array([1, 2]), np.array([2, 1]), np.array([1, -1]), 
-                      np.array([-1, -2]), np.array([-2, -1]), np.array([-1, 1])] 
+
+        steps = [np.array([1, 0]), np.array([0, 1]), np.array([1, 1])]
+        steps2 = [np.array([1, 2]), np.array([2, 1]), np.array([1, -1])]  
 
 
         for i, state in enumerate(self.bin_basis):
@@ -371,22 +354,21 @@ class StringBasis:
             jx_sum = np.count_nonzero(lat - lat_x ==0)
             jy_sum = np.count_nonzero(lat - lat_y ==0)
             jdiag_sum = np.count_nonzero(lat - lat_diag ==0)
-            diag = (jx_sum + jy_sum + jdiag_sum)#/2
+            diag = (jx_sum + jy_sum + jdiag_sum)/2
 
             # remove contributions from links adjacent to one of the holes
             x = np.ones((2,), dtype=int)* (self.depth +1) 
             for move in self.moves:
                 y = x + move
                 if lat[x[0],x[1]] == lat[y[0],y[1]]:
-                    diag -= 1#/2
-
+                    diag -= 1/2
 
             self.data_j.append(diag)
             self.row_j.append(i)
             self.col_j.append(i)
 
-            ##### compute off-diagonal part of H_J          
-            #only allows spin flips that shorten the string. For string to be connected after flip only end
+            #### compute off-diagonal part of H_J          
+            #### only allows spin flips that shorten the string. For string to be connected after flip only end
             siteslist = (np.argwhere(lat0)).tolist() # make sitelist either by retracing the seq or by subtracting neel background + argwhere
             for site in siteslist:
                 nx=[[1,0],[0,1],[1,1]]
@@ -398,12 +380,12 @@ class StringBasis:
                         a = self.state_2_list_entry(state1)
                         found, j  = self.basis.search(a)
                         if found:
-                            self.data_j_perp.append(1)      #why append data twice? because helene didn't use complex conjugate in the end
+                            self.data_j_perp.append(1)      
                             self.row_j_perp.append(j)
                             self.col_j_perp.append(i)
 
 
-            ##### compute H_{t}(k) part: 
+            #### compute H_{t}(k) part: 
             
             for step in steps:
                 if np.all(np.abs(np.sum(seq+[step],axis=0))<self.depth+1):
@@ -418,66 +400,29 @@ class StringBasis:
                         self.col_t.append(i)
                         self.data_t.append((-1*self.dist_2_phys_dist(step, seq)))
                         # print(f'phase: {-1*self.dist_2_phys_dist(step, seq)}, step: {step}')
-                        # print(f'coupled to state {j}')
+                        # print(f'state {i} coupled to state {j}')
                         # print()
                 
 
             ##### compute H_{t2}(k) part: 
-            for step in steps2:
-                lat1 = lat.copy()
-                if np.all(np.abs(np.sum(seq+[step],axis=0))<self.depth+1):
-                    lat1 = self.make_step(lat1, step)
-                    state1 = {'lat': lat1, 'seq': seq + [step]}
-                    # now state = H_{t'}|i>
-                    a = self.state_2_list_entry(state1)
-                    found, j = self.basis.search(a)
-                    if found:
-                        self.row_t2.append(j)
-                        self.col_t2.append(i)
-                        self.data_t2.append((-1*self.dist_2_phys_dist(step,seq)))
+            # for step in steps2:
+            #     lat1 = lat.copy()
+            #     if np.all(np.abs(np.sum(seq+[step],axis=0))<self.depth+1):
+            #         lat1 = self.make_step(lat1, step)
+            #         state1 = {'lat': lat1, 'seq': seq + [step]}
+            #         # now state = H_{t'}|i>
+            #         a = self.state_2_list_entry(state1)
+            #         found, j = self.basis.search(a)
+            #         if found:
+            #             self.row_t2.append(j)
+            #             self.col_t2.append(i)
+            #             self.data_t2.append((-1*self.dist_2_phys_dist(step,seq)))
 
         self.data_t = np.array(self.data_t)
         self.data_t2 = np.array(self.data_t2)
         self.data_j = np.array(self.data_j)
         self.data_j_perp = np.array(self.data_j_perp)
 
-    def eigenval(self, state=0):
-    # computes smallest eigenvalue of H
-        Es, _ = eigsh(self.H,k=state+1,which='SA',tol=self.tol)
-        return np.sort(Es)[state]
-    
-    def eigenvec(self, state=0, v0=False):
-    #computes eigenvector corresponding to the smallest eigenvalue
-        if len(self.bin_basis) == 2:
-            Es, vs = eigh(self.H.toarray())
-            if Es[0] == Es[1]:
-                return np.array([1, -1]) / np.sqrt(2)
-            else:
-                return vs[:, state]
-        else:
-            if v0:
-                v0 = np.ones((len(self.bin_basis),))/np.sqrt(len(self.bin_basis))
-                Es, vs = eigsh(self.H,k=state+1,which='SA',tol=self.tol, v0=v0)
-            else:
-                Es, vs = eigsh(self.H,k=state+1,which='SA',tol=self.tol)
-            sort_ind = np.argsort(Es)
-            vs = vs[:, sort_ind]
-            return vs[:,state]
-    
-    def eigensys(self, state=0, full=False):
-    # computes smallest eigenvalue of H
-        #Es, vs = eigsh(self.H,k=state+1,which='SA',tol=self.tol)
-        if len((self.H.toarray())[0]) > 1000:
-            print('use eigsh instead of eigh')
-        Es, vs = eigh(self.H.toarray())
-        sort_ind = np.argsort(Es)
-        Es = Es[sort_ind]
-        vs = vs[:, sort_ind]
-        if full:
-            return Es, vs
-        else:
-            return Es[state], vs[:,state] #default: returns the smallest eigenvalue, eigenstate
-        
     def compute_H(self, k, t=1.0, j=0.3, j_perp=0.3, t2=0):
     # uses list of data points from matrix_el_j and momentum to create sparse matrix H
     # k (array of size (2,1)) = hole momentum in LLP-frame
@@ -509,19 +454,61 @@ class StringBasis:
             row_j_perp = []
             col_j_perp = []
 
+        self.data_t_test = data_t
+        # print(f'tri data_t: {data_t}')
+        # from collections import Counter
+        # print('tri dictionary:',dict(Counter(sorted(data_t))))
+
+
         N = 1 #Normalization to Gellmann matrices
-        if self.honeycomb == False:
-            data = np.concatenate((data_t, np.conj(data_t), data_t2, np.conj(data_t2), N*j * np.array(self.data_j), N * np.array(data_j_perp)), axis=0)
-            row = np.array(row_t + col_t + row_t2 + col_t2 + self.row_j + row_j_perp + self.row_V)
-            col = np.array(col_t + row_t + col_t2 + row_t2 + self.col_j + col_j_perp + self.col_V)
-        else:  # for Honeycomb, no hermit conjugate possible
-            data = np.concatenate((data_t, data_t2, j * np.array(self.data_j), np.array(data_j_perp)), axis=0)
-            row = np.array(row_t + row_t2 + col_t2 + self.row_j + row_j_perp + self.row_V)
-            col = np.array(col_t + col_t2 + row_t2 + self.col_j + col_j_perp + self.col_V)
+        # if self.honeycomb == False:
+        data = np.concatenate((data_t, np.conj(data_t), data_t2, np.conj(data_t2), N*j * np.array(self.data_j), N * np.array(data_j_perp), N * np.conj(np.array(data_j_perp))), axis=0)
+        row = np.array(row_t + col_t + row_t2 + col_t2 + self.row_j + row_j_perp + col_j_perp)
+        col = np.array(col_t + row_t + col_t2 + row_t2 + self.col_j + col_j_perp + row_j_perp)
+        
+
+        self.data = data
 
         self.H = csr_matrix((data, (row,col)), shape=(len(self.bin_basis), len(self.bin_basis)), dtype=np.csingle)
         self.H.eliminate_zeros() # (only helpful if either t or j = 0)
 
+    def eigenval(self, state=0):
+    # computes smallest eigenvalue of H
+        Es, _ = eigsh(self.H,k=state+1,which='SA',tol=self.tol)
+        return np.sort(Es)[state]
+    
+    def eigenvec(self, state=0, v0=False):
+    #computes eigenvector corresponding to the smallest eigenvalue
+        if len(self.bin_basis) == 2:
+            Es, vs = eigh(self.H.toarray())
+            if Es[0] == Es[1]:
+                return np.array([1, -1]) / np.sqrt(2)
+            else:
+                return vs[:, state]
+        else:
+            if v0:
+                v0 = np.ones((len(self.bin_basis),))/np.sqrt(len(self.bin_basis))
+                Es, vs = eigsh(self.H,k=state+1,which='SA',tol=self.tol, v0=v0)
+            else:
+                Es, vs = eigsh(self.H,k=state+1,which='SA',tol=self.tol)
+            sort_ind = np.argsort(Es)
+            vs = vs[:, sort_ind]
+            return vs[:,state]
+    
+    def eigensys(self, state=0, full=False):
+    # computes smallest eigenvalue of H
+        #Es, vs = eigsh(self.H,k=state+1,which='SA',tol=self.tol)
+        if self.depth > 2:
+            Es, vs = eigsh(self.H,k=state+1,which='SA',tol=self.tol)
+        else:
+            Es, vs = eigh(self.H.toarray())
+        sort_ind = np.argsort(Es)
+        Es = Es[sort_ind]
+        vs = vs[:, sort_ind]
+        if full:
+            return Es, vs
+        else:
+            return Es[state], vs[:,state] #default: returns the smallest eigenvalue, eigenstate
 
     def dispersion(self, k_array, state=0, t=1, t2=0, j=0.3, j_perp=0.3, two_D=False):
     #returns array of energies corresponding to the moments in k_array
@@ -686,34 +673,31 @@ def run(args):
     k_grid = np.meshgrid(k_vals, k_vals)
 
     # 1D
-    Gamma = np.array([0, 0])
-    if honeycomb == False and Magnetic_BZ == False:
-        K = 4*np.pi/3*np.array([0,1])
-        M = np.pi/np.sqrt(3)*np.array([1, np.sqrt(3)])
-    else:
-        K = 4*np.pi/(3*np.sqrt(3))*np.array([1, 0])
-        M = np.pi/3*np.array([np.sqrt(3), 1])
+    K = 4*np.pi/(3*np.sqrt(3))*np.array([1, 0])
+    Kp = 2*np.pi/(3*np.sqrt(3))*np.array([1, np.sqrt(3)])
+    M = np.pi/3*np.array([np.sqrt(3), 1])
+    Gamma = np.array([0,0])
 
-    # Paths between symmetry point   
+    # Paths between symmetry point 
     path1 = np.linspace(Gamma, K, int(points_1D/3), endpoint=False)
     path2 = np.linspace(K, M, int(points_1D/6), endpoint=False)
-    path3 = np.linspace(M, Gamma, int(points_1D/2)+1)
-    k_path = np.vstack((path1, path2, path3))
-    #k_path[0], k_path[1] = -k_path[1], k_path[0]
+    path3 = np.linspace(M, Kp, int(points_1D/6), endpoint=False)
+    path4 = np.linspace(Kp, Gamma, int(points_1D/3)+1)
+    k_path = np.vstack((path1, path2, path3, path4))
 
     path_data = '/Users/linushein/Documents/Python/Python_output/SU(3)_truncated2'
 
     if D1 == True:
         t0 = perf_counter()
-        E_1D = np.zeros([state+1,len(k_path)])
-        for i in range(state+1):
+        E_1D = np.zeros([state,len(k_path)])
+        for i in range(state):
             E_1D[i], _ = sb.dispersion(k_path, two_D=False, state=i, t=t, t2=t2, j=j, j_perp=j_perp)
             #print(f'band {i}: E = {E_1D[i]}')
         print('computed 1D dispersion in {t:.3f}s'.format(t=perf_counter()-t0))
         if honeycomb == True:
-            name2 = f'string_1hole_1D_disp_SU2_Honeycomb_depth{depth}_t{t}_t2{t2}_J{j}_Jperp{j_perp}_{state}bands.npy'
+            name2 = f'string_1hole_basis2_1D_disp_SU2_Honeycomb_depth{depth}_t{t}_t2{t2}_J{j}_Jperp{j_perp}_{state}bands.npy'
         else:
-            name2 = f'string_1hole_1D_disp_SU(3)_depth{depth}_t{t}_t2{t2}_J{j}_Jperp{j_perp}_{state}bands.npy'
+            name2 = f'string_1hole_basis2_1D_disp_SU(3)_depth{depth}_t{t}_t2{t2}_J{j}_Jperp{j_perp}_{state}bands.npy'
         np.save(os.path.join(path_data, name2), E_1D)
 
     if D2 == True:
@@ -728,9 +712,9 @@ def run(args):
             print(f'for band {i}:')
             print('computed 2D dispersion in {t:.3f}s'.format(t=perf_counter()-t0))
         if honeycomb == True:
-            name = f'string_1hole_2D_disp_SU2_Honeycomb_depth{depth}_t{t}_t2{t2}_J{j}_Jperp{j_perp}_{state}bands.npy'
+            name = f'string_1hole_basis2_2D_disp_SU2_Honeycomb_depth{depth}_t{t}_t2{t2}_J{j}_Jperp{j_perp}_{state}bands.npy'
         else:
-            name = f'string_1hole_2D_disp_SU(3)_depth{depth}_t{t}_t2{t2}_J{j}_Jperp{j_perp}_{state}bands.npy'
+            name = f'string_1hole_basis2_2D_disp_SU(3)_depth{depth}_t{t}_t2{t2}_J{j}_Jperp{j_perp}_{state}bands.npy'
         np.save(os.path.join(path_data, name), E_2D)
 
 

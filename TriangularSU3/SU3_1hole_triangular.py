@@ -1,4 +1,3 @@
-# SU(3) triangular Linus 
 import numpy as np
 import copy
 from scipy.sparse.linalg import eigsh
@@ -68,14 +67,12 @@ class sorted_list:
 
 class StringBasis:
 # A class for generating a truncated basis
-    def __init__(self, depth, only_connected=True, honeycomb=False, big_unit_cell=True, basis2=False):  # works only for depth<=14 otherwise change uint32 to uint64!
+    def __init__(self, depth, only_connected=True, honeycomb=False, big_unit_cell=True):  # works only for depth<=14 otherwise change uint32 to uint64!
         self.depth = depth
         self.L_size = 2*self.depth+3 
         self.Neel_state = []
         self.basis = sorted_list(length_arr = self.L_size)
         self.bin_basis=[]
-        self.basis2 = sorted_list(length_arr = self.L_size) #second basis where hole starts on red sublattice i.e is on 
-        self.bin_basis2=[]
         self.last_move = [None, None]
         self.moves = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1]]
         self.H = None
@@ -83,17 +80,17 @@ class StringBasis:
         self.honeycomb = honeycomb
         self.big_unit_cell = big_unit_cell
         self.only_connected = only_connected
-        self.redhole_basis = basis2
         
         self.tol = 0
 
         self.triangular_Neel()
         self.generate_basis()
-        if self.redhole_basis and self.honeycomb:
-            self.generate_basis2()
         self.order_basis()
-        if self.redhole_basis:
-            self.order_basis2() 
+        # self.matrix_el()
+
+
+        self.data_t_test = []
+        self.data = []
 
     def triangular_Neel(self):
         # generates the three possible neel states (center site = 0,1,2 i.e red, green, blue) and saves them to list, because they are needed often
@@ -118,21 +115,9 @@ class StringBasis:
         sublattice = self.Neel_state[y]
         return sublattice
     
-    def find_sublattice2(self,state):
-        seq = state['seq']
-        y = np.sum(np.array(seq), axis=0, dtype=int)
-        y = (np.sum(y)+1)%3
-        sublattice = self.Neel_state[y]
-        return sublattice
-    
     def find_hole_sublattice(self,seq):      #linus 1.0
         x = np.sum(np.array(seq), axis=0, dtype=int)
         x = (np.sum(x))%3
-        return x
-    
-    def find_hole_sublattice2(self,seq):      #linus 1.0
-        x = np.sum(np.array(seq), axis=0, dtype=int)
-        x = (np.sum(x)+1)%3
         return x
     
     def hole_is_on_2_sublattice(self,state):
@@ -140,15 +125,6 @@ class StringBasis:
         seq = state['seq']
         x = np.sum(np.array(seq), axis=0, dtype=int)
         x = (np.sum(x))%3
-        if x == 2:
-            innit = True
-        return innit
-    
-    def hole_is_on_2_sublattice2(self,state):
-        innit = False
-        seq = state['seq']
-        x = np.sum(np.array(seq), axis=0, dtype=int)
-        x = (np.sum(x)+1)%3
         if x == 2:
             innit = True
         return innit
@@ -164,28 +140,44 @@ class StringBasis:
                 dist1[0] += 1
         elif not self.honeycomb and self.big_unit_cell:
             z = np.sum(np.array(seq), axis=0, dtype=int)
-            z = (-np.sum(z))%3
+            z = (-np.sum(z)+1)%3
             x,y = dist1[0]%3, dist1[1]%3
             dist1[0] += (z-x-y)%3-z
         return dist1
     
+    def dist_2_uc_dist_annika(self,dist,seq):   #transforms distance on the square lattice into distance between corresponding unit cells
+        dist1 = dist.copy()
+        ## Honeycomb
+        if self.honeycomb and self.big_unit_cell:
+            x = np.sum(np.array(dist1))
+            if x % 3 == 1:
+                dist1[1] += -1
+            elif x % 3 == 2:
+                dist1[1] += 1
+        elif not self.honeycomb and self.big_unit_cell:
+            z = np.sum(np.array(seq), axis=0, dtype=int)
+            z = (-np.sum(z)+1)%3
+            x,y = dist1[0]%3, dist1[1]%3
+            dist1[1] += (z-x-y)%3-z
+        return dist1
+    
     def dist_2_phys_dist(self,dist,seq):   #transforms square lattice with one diagonal coupling to triangular lattice (i,j) = (sqrt(3)/2*i, j - 1/2*i)
         phys_dist = np.zeros(2)
-        dist = self.dist_2_uc_dist(dist,seq)
+        dist = self.dist_2_uc_dist_annika(dist,seq)
         phys_dist[0], phys_dist[1] = np.sqrt(3)/2*dist[0], dist[1] - 1/2*dist[0]
         return phys_dist
 
-    def g_2_r_hole(self, state):
-        lat = state['lat']
-        lat0 = lat.copy()
-        lat_red = (lat0+np.ones(self.L_size,dtype=int))%3
-        lat_red[self.depth+1,self.depth+1] = 0
-        # print('lat0',lat0)
-        # print('ones', np.ones(self.L_size,dtype=int))
-        # print('lat_red',lat_red)
-        state_red = copy.deepcopy(state)
-        state_red['lat'] = lat_red
-        return state_red
+    # def g_2_r_hole(self, state):
+    #     lat = state['lat']
+    #     lat0 = lat.copy()
+    #     lat_red = (lat0+np.ones(self.L_size,dtype=int))%3
+    #     lat_red[self.depth+1,self.depth+1] = 0
+    #     # print('lat0',lat0)
+    #     # print('ones', np.ones(self.L_size,dtype=int))
+    #     # print('lat_red',lat_red)
+    #     state_red = copy.deepcopy(state)
+    #     state_red['lat'] = lat_red
+    #     return state_red
 
     def connected(self, state):     #done
         # state should be list of dictionary with keys 'lat', 'seq'
@@ -270,32 +262,7 @@ class StringBasis:
         check = new and physical
         if check:
             self.bin_basis.append(state)  #maybe better to put states in bins, divided into their sublattices
-
-            if self.redhole_basis and not self.honeycomb:
-                new = self.basis2.add(self.state_2_list_entry(self.g_2_r_hole(state)) + [self.basis2.length])
-                self.bin_basis2.append(self.g_2_r_hole(state))
-        
-
-    def generate_basis2_element(self, state, step):      #adds only connected and new states to basis and bin_basis
-
-        lat = self.make_step(state['lat'], step)
-        seq = state['seq'] + [step]
-        state = {'lat': lat, 'seq': seq}      #need to figure out if I want to save the state like this or as an array of arrays.
-        # print(lat)
-        # print(seq)
-
-        if self.only_connected:
-            physical = self.connected(state)
-        else:
-            physical = True
-        new = False
-        if physical:
-            new = self.basis2.add(self.state_2_list_entry(state) + [self.basis2.length])
-        check = new and physical
-        if check:
-            self.bin_basis2.append(state)  #maybe better to put states in bins, divided into their sublattices
-        
-
+         
     def make_step(self, lat, step):  #done
         # lat = 2D boolean array with spin configurations (holes are False)
         # step = [x, y] gives the hopping
@@ -337,9 +304,6 @@ class StringBasis:
 
             self.basis.add(self.state_2_list_entry(state0) + [self.basis.length])
             self.bin_basis.append(state0)
-            if self.redhole_basis and not self.honeycomb:
-                self.basis2.add(self.state_2_list_entry(self.g_2_r_hole(state0)) + [self.basis.length])
-                self.bin_basis2.append(self.g_2_r_hole(state0))
 
             l = 0
             n0 = 0
@@ -360,52 +324,6 @@ class StringBasis:
                 l += 1
                 n0 = n1 
 
-    def generate_basis2(self):                                                       #under construction
-        """ method to generate the entire basis (as list of 1D list of uint32) """
-        if self.honeycomb:
-            lattice = 'honeycomb'
-            if self.big_unit_cell:
-                uc = 'two site uc'
-            else:
-                uc = 'one site uc'
-        else:
-            lattice = 'triangular'
-            if self.big_unit_cell:
-                uc = 'three site uc'
-            else:
-                uc = 'one site uc'
-        print(f'generate 1hole basis2 for {lattice} lattice with {uc}')
-        if self.basis2.length > 0:
-            print('Basis2 has already been built')
-        else:
-            lat = self.Neel_state[1] #hole on red
-            seq = []
-            #Neel state
-            state0 = {'lat': lat, 'seq': seq}
-            #print(state0)
-
-            self.basis2.add(self.state_2_list_entry(state0) + [self.basis2.length])
-            self.bin_basis2.append(state0)
-
-            l = 0
-            n0 = 0
-            while l < self.depth:
-                n1 = self.basis.length
-                for n in range(n0, n1):
-                    state0 = self.bin_basis[n]
-                    seq = state0['seq']
-                    for move in self.moves:
-                        if self.honeycomb == True:
-                            a = self.hole_is_on_2_sublattice2({'seq': state0['seq']+[move]})
-                            if a == False:
-                                state_initial = copy.deepcopy(state0)
-                                self.generate_basis2_element(state_initial, np.array(move, dtype=int))
-                        else:
-                            state_initial = copy.deepcopy(state0)
-                            self.generate_basis2_element(state_initial, np.array(move, dtype=int))
-                l += 1
-                n0 = n1 
-
     def order_basis(self):
         #orders the bin basis
         ordered_list = []
@@ -416,14 +334,6 @@ class StringBasis:
             # ordered_list2.append(self.bin_basis2[m])
         self.bin_basis = ordered_list
         # self.bin_basis = ordered_list2
-
-    def order_basis2(self):
-        #orders the bin basis
-        ordered_list = []
-        for x in self.basis2.list:
-            m = x[-1]
-            ordered_list.append(self.bin_basis2[m])
-        self.bin_basis2 = ordered_list
 
     def matrix_el(self):    #should I include j_z & j_perp?
     # compute matrix element of t-J-Hamiltonian up to a shift = energy of undoped Neel configuration
@@ -444,14 +354,9 @@ class StringBasis:
         self.data_j_perp = []
         self.col_j_perp = []
         self.row_j_perp = []
-        if self.honeycomb == False:
-            steps = [np.array([1, 0]), np.array([0, 1]), np.array([1, 1])]
-            steps2 = [np.array([1, 2]), np.array([2, 1]), np.array([1, -1])] 
-        else:
-            steps = [np.array([1, 0]), np.array([0, 1]), np.array([1, 1]), 
-                     np.array([-1, 0]), np.array([0, -1]), np.array([-1, -1])] 
-            steps2 = [np.array([1, 2]), np.array([2, 1]), np.array([1, -1]), 
-                      np.array([-1, -2]), np.array([-2, -1]), np.array([-1, 1])] 
+
+        steps = [np.array([1, 0]), np.array([0, 1]), np.array([1, 1])]
+        steps2 = [np.array([1, 2]), np.array([2, 1]), np.array([1, -1])]  
 
 
         for i, state in enumerate(self.bin_basis):
@@ -475,22 +380,21 @@ class StringBasis:
             jx_sum = np.count_nonzero(lat - lat_x ==0)
             jy_sum = np.count_nonzero(lat - lat_y ==0)
             jdiag_sum = np.count_nonzero(lat - lat_diag ==0)
-            diag = (jx_sum + jy_sum + jdiag_sum)#/2
+            diag = (jx_sum + jy_sum + jdiag_sum)/2
 
             # remove contributions from links adjacent to one of the holes
             x = np.ones((2,), dtype=int)* (self.depth +1) 
             for move in self.moves:
                 y = x + move
                 if lat[x[0],x[1]] == lat[y[0],y[1]]:
-                    diag -= 1#/2
-
+                    diag -= 1/2
 
             self.data_j.append(diag)
             self.row_j.append(i)
             self.col_j.append(i)
 
-            ##### compute off-diagonal part of H_J          
-            #only allows spin flips that shorten the string. For string to be connected after flip only end
+            #### compute off-diagonal part of H_J          
+            #### only allows spin flips that shorten the string. For string to be connected after flip only end
             siteslist = (np.argwhere(lat0)).tolist() # make sitelist either by retracing the seq or by subtracting neel background + argwhere
             for site in siteslist:
                 nx=[[1,0],[0,1],[1,1]]
@@ -502,12 +406,12 @@ class StringBasis:
                         a = self.state_2_list_entry(state1)
                         found, j  = self.basis.search(a)
                         if found:
-                            self.data_j_perp.append(1)      #why append data twice? because helene didn't use complex conjugate in the end
+                            self.data_j_perp.append(1)      
                             self.row_j_perp.append(j)
                             self.col_j_perp.append(i)
 
 
-            ##### compute H_{t}(k) part: 
+            #### compute H_{t}(k) part: 
             
             for step in steps:
                 if np.all(np.abs(np.sum(seq+[step],axis=0))<self.depth+1):
@@ -522,23 +426,23 @@ class StringBasis:
                         self.col_t.append(i)
                         self.data_t.append((-1*self.dist_2_phys_dist(step, seq)))
                         # print(f'phase: {-1*self.dist_2_phys_dist(step, seq)}, step: {step}')
-                        # print(f'coupled to state {j}')
+                        # print(f'state {i} coupled to state {j}')
                         # print()
                 
 
             ##### compute H_{t2}(k) part: 
-            for step in steps2:
-                lat1 = lat.copy()
-                if np.all(np.abs(np.sum(seq+[step],axis=0))<self.depth+1):
-                    lat1 = self.make_step(lat1, step)
-                    state1 = {'lat': lat1, 'seq': seq + [step]}
-                    # now state = H_{t'}|i>
-                    a = self.state_2_list_entry(state1)
-                    found, j = self.basis.search(a)
-                    if found:
-                        self.row_t2.append(j)
-                        self.col_t2.append(i)
-                        self.data_t2.append((-1*self.dist_2_phys_dist(step,seq)))
+            # for step in steps2:
+            #     lat1 = lat.copy()
+            #     if np.all(np.abs(np.sum(seq+[step],axis=0))<self.depth+1):
+            #         lat1 = self.make_step(lat1, step)
+            #         state1 = {'lat': lat1, 'seq': seq + [step]}
+            #         # now state = H_{t'}|i>
+            #         a = self.state_2_list_entry(state1)
+            #         found, j = self.basis.search(a)
+            #         if found:
+            #             self.row_t2.append(j)
+            #             self.col_t2.append(i)
+            #             self.data_t2.append((-1*self.dist_2_phys_dist(step,seq)))
 
         self.data_t = np.array(self.data_t)
         self.data_t2 = np.array(self.data_t2)
@@ -575,19 +479,21 @@ class StringBasis:
             data_j_perp = []
             row_j_perp = []
             col_j_perp = []
-        from collections import Counter
-        # print('dictionary:',dict(Counter(sorted(data_t))))
+
+        self.data_t_test = data_t
+        # print(f'tri data_t: {data_t}')
+        # from collections import Counter
+        # print('tri dictionary:',dict(Counter(sorted(data_t))))
 
 
         N = 1 #Normalization to Gellmann matrices
-        if self.honeycomb == False:
-            data = np.concatenate((data_t, np.conj(data_t), data_t2, np.conj(data_t2), N*j * np.array(self.data_j), N * np.array(data_j_perp)), axis=0)
-            row = np.array(row_t + col_t + row_t2 + col_t2 + self.row_j + row_j_perp + self.row_V)
-            col = np.array(col_t + row_t + col_t2 + row_t2 + self.col_j + col_j_perp + self.col_V)
-        else:  # for Honeycomb, no hermit conjugate possible
-            data = np.concatenate((data_t, data_t2, j * np.array(self.data_j), np.array(data_j_perp)), axis=0)
-            row = np.array(row_t + row_t2 + col_t2 + self.row_j + row_j_perp + self.row_V)
-            col = np.array(col_t + col_t2 + row_t2 + self.col_j + col_j_perp + self.col_V)
+        # if self.honeycomb == False:
+        data = np.concatenate((data_t, np.conj(data_t), data_t2, np.conj(data_t2), N*j * np.array(self.data_j), N * np.array(data_j_perp), N * np.conj(np.array(data_j_perp))), axis=0)
+        row = np.array(row_t + col_t + row_t2 + col_t2 + self.row_j + row_j_perp + col_j_perp)
+        col = np.array(col_t + row_t + col_t2 + row_t2 + self.col_j + col_j_perp + row_j_perp)
+        
+
+        self.data = data
 
         self.H = csr_matrix((data, (row,col)), shape=(len(self.bin_basis), len(self.bin_basis)), dtype=np.csingle)
         self.H.eliminate_zeros() # (only helpful if either t or j = 0)
@@ -718,6 +624,8 @@ class StringBasis:
             if self.honeycomb and self.big_unit_cell:
                 if len(state['seq'])%2 == 1:
                     phase = k[0]*np.sqrt(3)
+                    phase = 1/2*(k[0] * np.sqrt(3) + k[1]*3)
+                    phase = -1/2*(k[0] * np.sqrt(3) + k[1]*3)
             if not self.honeycomb and self.big_unit_cell:
                 x = self.find_hole_sublattice(seq)
                 if x == 1:
@@ -732,6 +640,40 @@ class StringBasis:
                 print('Couldnt find rotated state for rotation matrix')
         R = csr_matrix((data, (row, col)), shape=(self.basis.length, self.basis.length), dtype=np.csingle)
         return R
+    
+    def rot_trial_state(self, m3, k):
+        lat = self.Neel_state[0]
+        seq = []
+        state0 = {'lat': lat, 'seq': seq}
+        v = np.zeros((self.basis.length), dtype=complex)
+        lat = np.zeros((self.L_size, self.L_size), dtype=bool)
+        steps = [[-1, -1],[0, 1], [1, 0]] #hole 0 moves from sl 0 to 1
+        for n, step in enumerate(steps):
+            state = copy.deepcopy(state0)
+            lat = self.make_step(state['lat'], step)
+            seq = state['seq'] + [step]
+            state = {'lat': lat, 'seq': seq}
+            #print(state)
+
+            # search for this state in the basis
+            a = self.state_2_list_entry(state)
+            found, j = self.basis.search(a)
+            k_phase = k[0] * np.sqrt(3)
+            k_phase = 1/2*(-k[0] * np.sqrt(3) - k[1]*3)
+            #print(f'j={j}')
+            if found:
+                v[j] += 1/(np.sqrt(3)) * np.exp(1j * n * (2*np.pi/3 * m3)) * np.exp(-1j * k_phase) # k[0] * np.sqrt(3) added since these states are l=1
+        return v
+
+    def rot_trial_state_new(self,m3,k):
+        v0 = np.zeros((self.basis.length), dtype=complex)
+        v0[1] = 1/np.sqrt(3)
+        R = self.build_rot_matrix(k)
+        m3_phase = np.exp(1j * (2*np.pi/3) * m3)
+        v1 = R.dot(v0)*m3_phase
+        v2 = R.dot(v1)*m3_phase**2
+        v = (v0 + v1 + v2)
+        return v
     
     def rot_trial_state(self, m3, k):
         lat = self.Neel_state[0]
@@ -754,8 +696,6 @@ class StringBasis:
             if found:
                 v[j] += 1/(np.sqrt(3)) * np.exp(1j * n * (2*np.pi/3 * m3 + k[0] * np.sqrt(3))) # k[0] * np.sqrt(3) added since these states are l=1
         return v
-
-
 # -----------------------------------------------------------------------------------
 
 def run(args):
@@ -800,13 +740,9 @@ def run(args):
 
     # Paths between symmetry point 
     path1 = np.linspace(Gamma, K, int(points_1D/3), endpoint=False)
-    print('shape path1',path1.shape)
     path2 = np.linspace(K, M, int(points_1D/6), endpoint=False)
-    print('shape path2',path2.shape)
     path3 = np.linspace(M, Kp, int(points_1D/6), endpoint=False)
-    print('shape path3',path3.shape)
     path4 = np.linspace(Kp, Gamma, int(points_1D/3)+1)
-    print('shape path4',path4.shape)
     k_path = np.vstack((path1, path2, path3, path4))
 
     path_data = '/Users/linushein/Documents/Python/Python_output/SU(3)_truncated2'
@@ -844,19 +780,19 @@ def run(args):
 
 if __name__ == "__main__":
     args = {
-        "depth": 5,
+        "depth": 3,
         "j": 0.30,
         "j_perp": 0.30,
         "t": 1.0,
         "t2": 0,
         "fermions": True,   #irrelevant for single hole
         "connected": True,  
-        "state": 2,
+        "state": 5,
         "grid_size": 2*np.pi,  
         "points_2D": 120,
-        "points_1D": 100,
+        "points_1D": 60,
         "honeycomb": True,
-        "big_unit_cell": True,
+        "big_unit_cell": False,
         "1D_disp": True,
         "2D_disp": False,
         "all_2D_bands": True,

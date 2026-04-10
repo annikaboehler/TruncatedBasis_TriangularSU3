@@ -81,7 +81,7 @@ class StringBasis:
         self.big_unit_cell = big_unit_cell
         
         self.tol=0
-
+        self.Neel_state_L_size = []
         self.Neel_state = []
         self.triangular_Neel()
         self.generate_basis()
@@ -89,21 +89,32 @@ class StringBasis:
         self.generate_representatives()         #introducing representatives to make the holes distinguishable
         #self.matrix_el()
 
-    def triangular_Neel(self):      #linus 1.0
+        self.data_t_test = []
+        self.data = []
+
+    def triangular_Neel(self, D=0):      #linus 1.0
+        L_size = self.L_size
+        depth = self.depth
+        if D != 0:
+            depth = D
+            L_size = 2*D+3
         # generates the three possible neel states (center site = 0,1,2 i.e red, green, blue) and saves them to list, because they are needed often
         for k in range(3):
-            triangular_lattice = np.zeros((self.L_size, self.L_size), dtype=int)
-            for i in range(self.L_size):
-                for j in range(self.L_size):
-                    if (i+j+k+self.depth+1) % 3 == 0: # +self.depth+1 so center site is same for all lattice sizes
+            triangular_lattice = np.zeros((L_size, L_size), dtype=int)
+            for i in range(L_size):
+                for j in range(L_size):
+                    if (i+j+k+depth+1) % 3 == 0: # +self.depth+1 so center site is same for all lattice sizes
                         triangular_lattice[i,j] = 0
-                    elif (i+j+k+self.depth+1) % 3 == 1:
+                    elif (i+j+k+depth+1) % 3 == 1:
                         triangular_lattice[i,j] = 1
                     else:
                         triangular_lattice[i,j] = 2
-            triangular_lattice[self.depth+1,self.depth+1] = 0
+            triangular_lattice[depth+1,depth+1] = 0
             #print(triangular_lattice)
-            self.Neel_state.append(triangular_lattice)
+            if D==0:
+                self.Neel_state.append(triangular_lattice)
+            else:
+                self.Neel_state_L_size.append(triangular_lattice)
 
     def find_sublattice(self,state):      #linus 1.0
         seq = state['seq']
@@ -134,13 +145,12 @@ class StringBasis:
         hole2_sublattice = y
         return hole1_sublattice, hole2_sublattice   
     
-    def hole_is_on_2_sublattice(self,state):
+    def hole_is_on_2_sublattice(self,seq):
         innit = False
-        seq = state['seq']
         seq_hole_1 = []
         seq_hole_2 = []
         for move in seq:
-            if move[0] == 0:
+            if move[0] == 0: 
                 seq_hole_1.append(move[1:])
             else:
                 seq_hole_2.append(move[1:])
@@ -169,11 +179,28 @@ class StringBasis:
             dist1[0] += (z-x-y)%3-z
         return dist1
     
-    def dist_2_phys_dist(self,dist,seq):   #transforms square lattice with one diagonal coupling to triangular lattice (i,j) = (sqrt(3)/2*i, j - 1/2*i)
+    def dist_2_uc_dist_annika(self,dist,seq):   #transforms distance on the square lattice into distance between corresponding unit cells
+        dist1 = dist.copy()
+        ## Honeycomb
+        if self.honeycomb and self.big_unit_cell:
+            x = np.sum(np.array(dist1))
+            if x % 3 == 1:
+                dist1[1] += -1
+            elif x % 3 == 2:
+                dist1[1] += 1
+        elif not self.honeycomb and self.big_unit_cell:
+            z,_ = self.find_hole_sublattice(seq)
+            z = (-z+1)%3
+            x,y = dist1[0]%3, dist1[1]%3
+            dist1[1] += (z-x-y)%3-z
+        return dist1
+    
+    def dist_2_phys_dist(self,dist,seq,sl=False):   #transforms square lattice with one diagonal coupling to triangular lattice (i,j) = (sqrt(3)/2*i, j - 1/2*i)
         phys_dist = np.zeros(2)
-        dist = self.dist_2_uc_dist(dist,seq)
+        if not sl:
+            dist = self.dist_2_uc_dist_annika(dist,seq)
         phys_dist[0], phys_dist[1] = np.sqrt(3)/2*dist[0], dist[1] - 1/2*dist[0]
-        return phys_dist
+        return np.array(phys_dist)
     
     def connected(self, state):                 #linus 1.0
         res = False
@@ -222,7 +249,9 @@ class StringBasis:
         # print('lat in state_2_listentry',lat)
 
         if any(y < 0) or any(y >= self.L_size):
-            print(f'with lat:{lat}, hole_pos:{hole_pos}') 
+            print()
+            print(f'hole out of bounds with hole_pos:{hole_pos}')
+            print(f'lat:{lat}') 
             raise Exception('hole out of bounds')
         
         a = lat*np.matmul(np.ones((self.L_size, 1), dtype=np.uint64),
@@ -262,75 +291,104 @@ class StringBasis:
         if check:
             self.bin_basis.append(state)
     
-    def translation(self, lat, hole_pos, step):         #can only be used when step is in seq_hole_1  #Linus 1.0
+    def translation(self, lat, hole_pos, step, D=0, debug=False):         #can only be used when step is in seq_hole_1  #Linus 1.0
+        L_size = self.L_size
+        depth = self.depth
+        if D != 0:
+            depth = D
+            L_size = 2*D+3
+
         if step[0] != 0:
             print('wrong hole (translation)')
         x = step[1]
         y = step[2]
-
+        if any(hole_pos[1]-step[1:] < 0) or any(hole_pos[1]-step[1:] >= L_size):
+            print(f'step={step} out of bounds')
+            print(f'with lat:{lat}, hole_pos:{hole_pos}') 
+            raise Exception('out of bounds')
+        if debug:
+            print('lat pre translation',lat)
         if x > 0:
-            lat[:x, :] = (lat[:x, :]-self.depth)%3
+            lat[:x, :] = (lat[:x, :]-depth)%3
         elif x < 0:
-            lat[x:, :] = (lat[x:, :]+self.depth)%3
+            lat[x:, :] = (lat[x:, :]+depth)%3
         lat = np.roll(lat, -x, axis=0)
+        if debug:
+            print('lat post x translation',lat)
 
         if y > 0:
-            lat[:,:y] = (lat[:,:y]-self.depth)%3
+            lat[:,:y] = (lat[:,:y]-depth)%3
         elif y < 0:
-            lat[:,y:] = (lat[:,y:]+self.depth)%3
+            lat[:,y:] = (lat[:,y:]+depth)%3
         lat = np.roll(lat, -y, axis=1)
+        if debug:
+            print('lat post y translation',lat)
 
         hole_pos[0] = hole_pos[0] - step[1:]        #move 1st hole accordingly
         hole_pos[1] = hole_pos[1] - step[1:]        #move 2nd hole accordingly
         return lat, hole_pos
     
-    def make_step(self, lat, hole_pos, step):             #Linus 1.0
-        # lat = 2D boolean array with spin configurations (holes are False)
-        # step = [n, x, y] gives the hole and hopping
-        # hole_pos = list of arrays [[x1, y1], [x2, y1]] gives the position of both holes
+    def make_step(self, lat, hole_pos, step, D=0): 
+        L_size = self.L_size
+        if D != 0:
+            L_size = 2*D+3
+
         n = step[0]                 
-        x = hole_pos[n]             #ith hole before step
-        y = hole_pos[n] + step[1:]  #ith hole after step  
+        hole_n_old = hole_pos[n]             #ith hole before step
+        hole_n_new = hole_pos[n] + step[1:]  #ith hole after step  
 
-        a = hole_pos[0] + step[1:]
-        b = hole_pos[1] - step[1:]
 
-        if any(a < 0) or any(a >= self.L_size) or any(b < 0) or any(b >= self.L_size):
+        a = hole_pos[0] + step[1:]      
+        b = np.array([1,1])
+        if n == 0:
+            b = hole_pos[1] - step[1:]  #why this? -> only for n = 0
+        
+        
+        if any(a < 0) or any(a >= L_size) or any(b < 0) or any(b >= L_size):
             print(f'step={step} out of bounds')
             print(f'with lat:{lat}, hole_pos:{hole_pos}') 
             raise Exception('out of bounds')
 
-        lat[x[0], x[1]],lat[(y)[0], (y)[1]] = lat[(y)[0], (y)[1]], lat[x[0], x[1]]  #switch x and y
-        hole_pos[n] = y     
+        lat[hole_n_old[0], hole_n_old[1]],lat[hole_n_new[0], hole_n_new[1]] = lat[hole_n_new[0], hole_n_new[1]], lat[hole_n_old[0], hole_n_old[1]]  #switch x and y
+        hole_pos[n] = hole_n_new     
         
         # mark both hole sites as zero
         for n in range(2):
             lat[hole_pos[n][0], hole_pos[n][1]] = 0     #marks both hole position as zero, relevant for first move where one hole switches with another site, overwriting the the other hole on central site
         
         if step[0] == 0 :
-            lat, hole_pos = self.translation(lat, hole_pos, step)
+            lat, hole_pos = self.translation(lat, hole_pos, step, D=D)
 
         return lat, hole_pos
 
-    def exchange_holes(self, state):        #Linus 1.0
+    def exchange_holes(self, state, debug=False):        #Linus 1.0
+
         lat = state['lat']
         hole_pos = state['hole_pos']
         seq = state ['seq']
         delta = hole_pos[1].copy()
+        #switch hole positions
         hole_pos[1] = hole_pos[0].copy()
         hole_pos[0] = delta
-        #hole_pos[0], hole_pos[1] = hole_pos[1], hole_pos[0]
+        if debug:
+            print(f'hole_pos:{hole_pos}')
+
+        #translate back to center
         step = np.concatenate((np.zeros((1,), dtype=int), delta - self.depth - 1), axis=None)           #test translation() for step bigger than [1,1] done
-        # print(f'step={step}')       
-        lat, hole_pos = self.translation(lat, hole_pos, step)
+        lat, hole_pos = self.translation(lat, hole_pos, step, debug=debug)
         state['lat'] = lat
         state['hole_pos'] = hole_pos
+        if debug:
+            print(f'step={step}')
+            print(f'hole_pos after translation:{hole_pos}')
+            print(f'lat after translation:{hole_pos}')
+
         #update seq
-        seq2 = []
+        seq2 = [] 
         for move in seq:
-            move[0] = (move[0]+1)%2
+            move[0] = (move[0]+1)%2 
             seq2.append(move)
-        state['seq'] = seq2     #why no seq allowed? 
+        state['seq'] = seq2 
         return state
 
     def generate_basis(self):
@@ -366,7 +424,8 @@ class StringBasis:
                     state0 = self.bin_basis[n]
                     for move in self.moves: 
                         if self.honeycomb == True:
-                            a = self.hole_is_on_2_sublattice({'seq': state0['seq']+[move]})
+                            # a = self.hole_is_on_2_sublattice({'seq': state0['seq']+[move]})
+                            a = self.hole_is_on_2_sublattice(state0['seq']+[move])
                             if a == False:
                                 state_initial = copy.deepcopy(state0)
                                 self.generate_basis_element(state_initial, np.array(move, dtype=int))
@@ -393,6 +452,8 @@ class StringBasis:
             a = self.state_2_list_entry(state)
             found, m = self.basis.search(a)
             assert found
+            # print(f'basis length: {self.basis.length}')
+            # print(f'n:{n}, m:{m}')
             if m >= n:  # m=n impossible, holes cant be on top of each other
                 self.is_representative[n] = (True, m, len(self.representatives))    
                 self.representatives.append(self.bin_basis[n])
@@ -418,6 +479,8 @@ class StringBasis:
         self.col_j_perp = []
         self.row_j_perp = []
         if self.honeycomb == False:
+        # if self.honeycomb == self.honeycomb:
+            # steps = [np.array([1, 1, 0]), np.array([1, 0, 1]), np.array([1, 1, 1]),np.array([0, 1, 0]), np.array([0, 0, 1]), np.array([0, 1, 1])]
             steps = [np.array([1, 1, 0]), np.array([1, 0, 1]), np.array([1, 1, 1]),np.array([0, 1, 0]), np.array([0, 0, 1]), np.array([0, 1, 1])]
             steps2 = [np.array([1, 1, 2]), np.array([1, 2, 1]), np.array([1, 1, -1]), np.array([0, 1, 2]), np.array([0, 2, 1]), np.array([0, 1, -1])] 
         else:
@@ -428,7 +491,7 @@ class StringBasis:
 
 
         for i in range(len(self.representatives)):
-        # for i in [0]:
+        # for i in [4]:
         #     print(f'state {i}')
             state = self.representatives[i]
             lat = state['lat']
@@ -496,7 +559,17 @@ class StringBasis:
                         found, m  = self.basis.search(a)
                         rep, _, j = self.is_representative[m]
                         if found:
-                            # print('found j_perp coupling')
+                            state_new = self.representatives[j]
+                            lat_new=state_new['lat']
+                            hole_pos_new=state_new['hole_pos']
+                            seq_new=state_new['seq']
+                            lat0_new = (lat_new - self.find_sublattice(state_new))%3
+                            lat0_new[hole_pos[0][0],hole_pos[0][1]] = 0
+                            lat0_new[hole_pos[1][0],hole_pos[1][1]] = 0
+                            # print(f'TRI j_perp:{i} coupled to {j}')
+                            # print(f'siteslist1:{siteslist}, hole_pos1:{hole_pos}, sl1:{self.find_hole_sublattice(seq)}')
+                            # print(f'siteslist2:{(np.argwhere(lat0_new)).tolist()}, hole_pos2:{hole_pos_new}, sl2:{self.find_hole_sublattice(seq_new)}')
+                            # print()
                             self.row_j_perp.append(j)
                             self.row_j_perp.append(i)
                             self.col_j_perp.append(i)
@@ -506,8 +579,8 @@ class StringBasis:
                                 self.data_j_perp.append((0,np.zeros((2,), dtype=int)))
                             else:
                                 #print(f'i = {i}, j = {j}')
-                                self.data_j_perp.append((1,-1*self.dist_2_phys_dist(hole_pos[1] - self.depth - 1, seq)))  #why distance between holes? -> because we exchange the holes
-                                self.data_j_perp.append((1,self.dist_2_phys_dist(hole_pos[1] - self.depth - 1, seq)))     # h.c
+                                self.data_j_perp.append((1,-1*self.dist_2_phys_dist(hole_pos[1] - self.depth - 1, seq)))
+                                self.data_j_perp.append((1,self.dist_2_phys_dist(hole_pos[1] - self.depth - 1, seq))) 
             
             ##### compute H_{t}(k) part:      Linus: test H_{k)}
             for step in steps:
@@ -525,7 +598,8 @@ class StringBasis:
                         (rep, _, j) = self.is_representative[m]
                         self.row_t.append(j)
                         self.col_t.append(i)
-                        if step[0] == 0:
+                        # print(f'TRI rep {i} couples to {j} via step: {step}')
+                        if step[0] == 0: #first hole moves
                             if rep:
                                 self.data_t.append((0, -1*self.dist_2_phys_dist(step[1:], seq))) #no holes exchanged, no displacement, but still hopping of first hole 
                                 # print(f'{j} rep: {rep}, center hole moves')
@@ -542,7 +616,7 @@ class StringBasis:
                                 # phase = -1*self.dist_2_phys_dist(hole_pos1[1] - self.depth - 1 + step[1:], seq)
                                 # print(f'Phase*K1={(phase[0]*K1[0] + phase[1]*K1[1])/np.pi}')
                                 # print()
-                        else:
+                        else:   #second hole moves
                             if rep:
                                 self.data_t.append((0, np.zeros((2,), dtype=int))) #no holes exchanged, no displacement
                                 # print(f'{j} rep: {rep}, center hole doesnt move')
@@ -556,44 +630,168 @@ class StringBasis:
                                 # print(f'{j} rep: {rep}, center hole doenst move')
                                 # print(f'step: {self.dist_2_phys_dist(step[1:], seq)}, swapp distance: {self.dist_2_phys_dist(hole_pos1[1] - self.depth - 1, seq)}')
                                 # print(f'total phase={-self.dist_2_phys_dist(hole_pos1[1] - self.depth - 1, seq)}')
-                                # phase = -1*self.dist_2_phys_dist(hole_pos1[1] - self.depth - 1, seq)
-                                # print(f'Phase*K1={(phase[0]*K1[0] + phase[1]*K1[1])/np.pi}')
+                                # # phase = -1*self.dist_2_phys_dist(hole_pos1[1] - self.depth - 1, seq)
+                                # # print(f'Phase*K1={(phase[0]*K1[0] + phase[1]*K1[1])/np.pi}')
                                 # print()
+        # print('len data_t matrix_el: ', len(self.data_t))
+        # print('len row_t matrix_el: ', len(self.row_t))
+        # print('len col_t matrix_el: ', len(self.col_t))
 
+            # steps = [np.array([1, 1, 0]), np.array([1, 0, 1]), np.array([1, -1, -1])]
+            # la = hole_pos[1] - self.depth - 1
+            # la = self.dist_2_phys_dist(la, seq)
+            # # print(f'state {i} hole sublattices: {self.find_hole_sublattice(seq)}')
+            # if self.find_hole_sublattice(seq)[1]==0:
+            #     for step in steps:
+            #         y1 = hole_pos[1]+step[1:]
+            #         y2 = hole_pos[1]-step[1:]
+            #         if np.all((y1 >= 0) & (y1 < self.L_size)) and np.all((y2 >= 0) & (y2 < self.L_size)):  
+            #             lat1 = lat.copy()
+            #             hole_pos1 = hole_pos.copy()
+            #             lat1, hole_pos1 = self.make_step(lat1, hole_pos1, step)
+            #             state1 = {'lat': lat1, 'hole_pos': hole_pos1, 'seq': seq + [step]}
+            #             # now state = H_{t}|i>
+            #             a = self.state_2_list_entry(state1)
+            #             found, m = self.basis.search(a)
+            #             if found:
+            #                 (rep, _, j) = self.is_representative[m]
+            #                 self.row_t.append(j)
+            #                 self.col_t.append(i)
+            #                 # print(f'TRI rep {i} couples to {j} via step: {step} without swapping')
+            #                 if rep:
+            #                     self.data_t.append((0, np.zeros((2,), dtype=int))) #no holes exchanged, no displacement
+            #                     # print(f'TRI rep {i} couples to {j} via step: {step} with: ')
+            #                 else:
+            #                     self.data_t.append((1, -1*la)) #holes exchanged
+            #                     # print(f'TRI rep {i} couples to {j} via step: {step} with: swap2 ')
+                                
+            # state1 = copy.deepcopy(state)       #is normal copy enough here?  
+            # state_ex = self.exchange_holes(state1)  
+            # lat_ex = state_ex['lat']
+            # hole_pos_ex = state_ex['hole_pos']
+            # seq_ex = state_ex['seq']
+            # if self.find_hole_sublattice(seq_ex)[1]==0:
+            #     for step in steps:
+            #         y1 = hole_pos[1]+step[1:]
+            #         y2 = hole_pos[1]-step[1:]
+            #         if np.all((y1 >= 0) & (y1 < self.L_size)) and np.all((y2 >= 0) & (y2 < self.L_size)):  
+            #             lat1 = lat_ex.copy()
+            #             hole_pos1 = hole_pos_ex.copy()
+            #             lat1, hole_pos1 = self.make_step(lat1, hole_pos1, step)
+            #             state1 = {'lat': lat1, 'hole_pos': hole_pos1, 'seq': seq_ex + [step]}
+            #             # now state = H_{t}|i>
+            #             a = self.state_2_list_entry(state1)
+            #             found, m = self.basis.search(a)
+            #             if found:
+            #                 (rep, _, j) = self.is_representative[m]
+            #                 self.row_t.append(j)
+            #                 self.col_t.append(i)
+            #                 # print(f'TRI rep {i} couples to {j} via step: {step} with swapping')
+            #                 if rep:
+            #                     self.data_t.append((1, -1*la))
+            #                     # print(f'TRI rep {i} couples to {j} via step: {step} with: swap1 ')
+            #                 else:
+            #                     la2 = hole_pos1[1] - self.depth - 1
+            #                     la2 = self.dist_2_phys_dist(la2, seq_ex)
+            #                     self.data_t.append((0, -1*(la+la2)))
+            #                     # print(f'TRI rep {i} couples to {j} via step: {step} with: swap1, swap2 ')
+
+
+        # print('len data_t matrix_el: ', len(self.data_t)) 
 
             ##### compute H_{t'}(k) part:   next nearest neighbour hopping
-            for step in steps2:
-                y1 = hole_pos[1]+step[1:]
-                y2 = hole_pos[1]-step[1:]
-                if np.all((y1 >= 0) & (y1 < self.L_size)) and np.all((y2 >= 0) & (y2 < self.L_size)):   
-                    lat1 = lat.copy()
-                    hole_pos1 = hole_pos.copy()                     
-                    lat1, hole_pos1 = self.make_step(lat1, hole_pos1, step)
-                    y = hole_pos1[1]
-                    state1 = {'lat': lat1, 'hole_pos': hole_pos1, 'seq': seq + [step]}
-                    y = hole_pos1[1]
-                        # now state = H_{t}|i>
-                    a = self.state_2_list_entry(state1)
-                    found, m = self.basis.search(a)
-                    if found:
-                        # print('found t2 coupling')
-                        # print(f'seq1: {seq}, step:{step}, seq2:{self.bin_basis[m]['seq']}')
-                        # print()
-                        (rep, _, j) = self.is_representative[m]
-                        self.row_t2.append(j)
-                        self.col_t2.append(i)
-                        if step[0] == 0:
-                            if rep:
-                                self.data_t2.append((0, -1*self.dist_2_phys_dist(step[1:],seq))) #no holes exchanged, no displacement, but still hopping of first hole 
-                                #print(f'i = {i}, seq_i={seq}, j = {j}, seq_j={self.representatives[j]['seq']}, step = {step}, rep')
-                            else:
-                                self.data_t2.append((1, -1*self.dist_2_phys_dist(hole_pos1[1] - self.depth - 1 + step[1:],seq))) #distance in physical lattice
-                        else:
-                            if rep:
-                                self.data_t2.append((0, np.zeros((2,), dtype=int))) #no holes exchanged, no displacement
-                                #print(f'i = {i}, seq_i={seq}, j = {j}, seq_j={self.representatives[j]['seq']}, step = {step}, rep')
-                            else:
-                                self.data_t2.append((1, -1*self.dist_2_phys_dist(hole_pos1[1] - self.depth - 1,seq))) #distance in physical lattice  
+            # for step in steps2:
+            #     y1 = hole_pos[1]+step[1:]
+            #     y2 = hole_pos[1]-step[1:]
+            #     if np.all((y1 >= 0) & (y1 < self.L_size)) and np.all((y2 >= 0) & (y2 < self.L_size)):   
+            #         lat1 = lat.copy()
+            #         hole_pos1 = hole_pos.copy()                     
+            #         lat1, hole_pos1 = self.make_step(lat1, hole_pos1, step)
+            #         y = hole_pos1[1]
+            #         state1 = {'lat': lat1, 'hole_pos': hole_pos1, 'seq': seq + [step]}
+            #         y = hole_pos1[1]
+            #             # now state = H_{t}|i>
+            #         a = self.state_2_list_entry(state1)
+            #         found, m = self.basis.search(a)
+            #         if found:
+            #             # print('found t2 coupling')
+            #             # print(f'seq1: {seq}, step:{step}, seq2:{self.bin_basis[m]['seq']}')
+            #             # print()
+            #             (rep, _, j) = self.is_representative[m]
+            #             self.row_t2.append(j)
+            #             self.col_t2.append(i)
+            #             if step[0] == 0:
+            #                 if rep:
+            #                     self.data_t2.append((0, -1*self.dist_2_phys_dist(step[1:],seq))) #no holes exchanged, no displacement, but still hopping of first hole 
+            #                     #print(f'i = {i}, seq_i={seq}, j = {j}, seq_j={self.representatives[j]['seq']}, step = {step}, rep')
+            #                 else:
+            #                     self.data_t2.append((1, -1*self.dist_2_phys_dist(hole_pos1[1] - self.depth - 1 + step[1:],seq))) #distance in physical lattice
+            #             else:
+            #                 if rep:
+            #                     self.data_t2.append((0, np.zeros((2,), dtype=int))) #no holes exchanged, no displacement
+            #                     #print(f'i = {i}, seq_i={seq}, j = {j}, seq_j={self.representatives[j]['seq']}, step = {step}, rep')
+            #                 else:
+            #                     self.data_t2.append((1, -1*self.dist_2_phys_dist(hole_pos1[1] - self.depth - 1,seq))) #distance in physical lattice  
+         
+    def compute_H(self, k, t=1, j=0.3, j_perp=0.3, t2=0, p=-1, V=0):
+    # uses list of data points from matrix_el_j and momentum to create sparse matrix H
+    # k (array of size (2,1)) = hole momentum in LLP-frame
+        # print('len(data_t): ', len(self.data_t))    
+        if len(self.data_t) > 0:
+            data_1 = np.array([x[0] for x in self.data_t])
+            data_2 = np.array([x[1] for x in self.data_t])
+            data_t = t * p ** data_1 * np.exp(1j * (data_2[:,0]*k[0]+data_2[:,1]*k[1]))
+        else:
+            data_t = []
+        # self.data_t_test = data_t
+        # self.data_t_test = np.concatenate((np.array(data_t), np.array(data_t).conj()))
+
+        # print('len data_t compute_H: ', len(data_t))
+
+        if bool(t2) and len(self.data_t2) > 0:
+            data_1 = np.array([x[0] for x in self.data_t2])
+            data_2 = np.array([x[1] for x in self.data_t2])
+            data_t = t2 * p ** data_1 * np.exp(1j * (data_2[:,0]*k[0]+data_2[:,1]*k[1]))            
+            row_t2 = self.row_t2
+            col_t2 = self.col_t2
+        else:
+            data_t2 = []
+            row_t2 = []
+            col_t2 = []
+        # print('len data_t2 compute_H: ', len(data_t2))
+
+        if bool(self.data_j_perp):
+            data_1 = np.array([x[0] for x in self.data_j_perp])
+            data_2 = np.array([x[1] for x in self.data_j_perp])
+            data_j_perp = 1/2 * j_perp * p ** data_1 * np.exp(1j * (data_2[:,0]*k[0]+data_2[:,1]*k[1]))
+            row_j_perp = self.row_j_perp
+            col_j_perp = self.col_j_perp
+        else:
+            data_j_perp = []
+            row_j_perp = []
+            col_j_perp = []
+        # print('len data_j_perp compute_H: ', len(data_j_perp))
+        # print('len col_j_perp compute_H: ', len(col_j_perp))
+        # print('len row_j_perp compute_H: ', len(row_j_perp))
+        
+        N = 1  # normalization factor
+        # if self.honeycomb == self.honeycomb:
+        if self.honeycomb == False:
+            data = np.concatenate((data_t, np.conj(data_t), data_t2, np.conj(data_t2), N*j * np.array(self.data_j), N * np.array(data_j_perp)), axis=0)
+            row = np.array(self.row_t + self.col_t + row_t2 + col_t2 + self.row_j + row_j_perp)
+            col = np.array(self.col_t + self.row_t + col_t2 + row_t2 + self.col_j + col_j_perp)
+        else:  
+            data = np.concatenate((data_t, data_t2, j * np.array(self.data_j), np.array(data_j_perp)), axis=0)
+            row = np.array(self.row_t + row_t2 + col_t2 + self.row_j + row_j_perp) 
+            col = np.array(self.col_t + col_t2 + row_t2 + self.col_j + col_j_perp)
+
+        self.data = data
+        # print(f"Length of data array: {len(data)}")
+        # print(f"Length of row array: {len(row)}") 
+        # print(f"Length of col array: {len(col)}")
+
+        self.H = csr_matrix((data, (row,col)), shape=(len(self.representatives), len(self.representatives)), dtype=np.csingle)
+        self.H.eliminate_zeros() # (only helpful if either t or j = 0)
 
     def eigenval(self, state=0):
     # computes smallest eigenvalue of H
@@ -634,54 +832,6 @@ class StringBasis:
             
             return Es[state], vs[:,state]
         
-    def compute_H(self, k, t=1, j=0.3, j_perp=0.3, t2=0, p=-1, V=0):
-    # uses list of data points from matrix_el_j and momentum to create sparse matrix H
-    # k (array of size (2,1)) = hole momentum in LLP-frame
-        
-        if len(self.data_t) > 0:
-            data_1 = np.array([x[0] for x in self.data_t])
-            data_2 = np.array([x[1] for x in self.data_t])
-            data_t = t * p ** data_1 * np.exp(1j * (data_2[:,0]*k[0]+data_2[:,1]*k[1]))
-        else:
-            data_t = []
-
-        if bool(t2) and len(self.data_t2) > 0:
-            data_1 = np.array([x[0] for x in self.data_t2])
-            data_2 = np.array([x[1] for x in self.data_t2])
-            data_t = t2 * p ** data_1 * np.exp(1j * (data_2[:,0]*k[0]+data_2[:,1]*k[1]))            
-            row_t2 = self.row_t2
-            col_t2 = self.col_t2
-        else:
-            data_t2 = []
-            row_t2 = []
-            col_t2 = []
-
-        if bool(self.data_j_perp):
-            data_1 = np.array([x[0] for x in self.data_j_perp])
-            data_2 = np.array([x[1] for x in self.data_j_perp])
-            #data_j_perp = 1/2 * p ** data_1 * np.exp(1j * np.einsum('k,nk->n', k, data_2))
-            data_j_perp = 1/2 * p ** data_1 * np.exp(1j * (data_2[:,0]*k[0]+data_2[:,1]*k[1]))
-            row_j_perp = self.row_j_perp
-            col_j_perp = self.col_j_perp
-        else:
-            data_j_perp = []
-            row_j_perp = []
-            col_j_perp = []
-
-        
-        if self.honeycomb == False:
-            N = 1 #Normalization to Gellmann matrices
-            data = np.concatenate((data_t, np.conj(data_t), data_t2, np.conj(data_t2), N*j * np.array(self.data_j), N*j_perp * np.array(data_j_perp), V * np.array(self.data_V)), axis=0)
-            row = np.array(self.row_t + self.col_t + row_t2 + col_t2 + self.row_j + row_j_perp + self.row_V)
-            col = np.array(self.col_t + self.row_t + col_t2 + row_t2 + self.col_j + col_j_perp + self.col_V)
-        else:  # for Honeycomb, no hermit conjugate possible
-            data = np.concatenate((data_t, data_t2, j * np.array(self.data_j), j_perp * np.array(data_j_perp), V * np.array(self.data_V)), axis=0)
-            row = np.array(self.row_t + row_t2 + col_t2 + self.row_j + row_j_perp + self.row_V)
-            col = np.array(self.col_t + col_t2 + row_t2 + self.col_j + col_j_perp + self.col_V)
-
-        self.H = csr_matrix((data, (row,col)), shape=(len(self.representatives), len(self.representatives)), dtype=np.csingle)
-        self.H.eliminate_zeros() # (only helpful if either t or j = 0)
-
     def delete_weak_j_perp(self, t, j, j_perp, cutoff=1e-4):
         '''
         Looks for the j_perp processes with the most important contributions and delete the rest of them from self.data_j_perp
@@ -802,11 +952,12 @@ class StringBasis:
         self.col_j_perp = col
 
     def dispersion(self,k_array,two_D=False, state=0, t=1, j=0.3, t2=0, j_perp=0.3, p=-1, V=0):
-    # returns array of energies corresponding to the moments in k_array
-    # 2D == False: k_array = array of shape (Num_points,2)
-    # 2D == True: k_array = Meshgrid(x,y)
+        # returns array of energies corresponding to the moments in k_array
+        # 2D == False: k_array = array of shape (Num_points,2)
+        # 2D == True: k_array = Meshgrid(x,y)
     
         if two_D:
+            print(f'Computing 2D dispersion for state {state}')
             Ev = []
             k_x=k_array[0]
             k_y=k_array[1]
@@ -817,6 +968,7 @@ class StringBasis:
                     E[i,l]=self.eigenval(state)
 
         else:
+            print(f'Computing 1D dispersion for state {state}')
             E=[] 
             Ev = []
             for i in range(k_array.shape[0]):
@@ -1074,7 +1226,7 @@ class StringBasis:
 # -----------------------------------------------------------------------------------
 
 def run(args):
-    depth = args["depth"] 
+    depth = args["depth"]
     t = args["t"]
     t2 = args["t2"]
     j = args["j"]
@@ -1121,7 +1273,8 @@ def run(args):
     path4 = np.linspace(Kp, Gamma, int(points_1D/3)+1)
     k_path = np.vstack((path1, path2, path3, path4))
 
-    path_data = '/Users/linushein/Documents/Python/Python_output/SU(3)_truncated2'
+    path_data = '/Users/linushein/Documents/Python/Python_output/SU(3)_truncated2/'
+
     if ferm == True:
         stat = 'fermion'
         p = -1
@@ -1152,8 +1305,7 @@ def run(args):
         # print(f'E2D shape = {E_2D.shape}')
         for i in range(x):
             E_2D[i], _ = sb.dispersion(k_grid, t=t, t2=t2, j=j, j_perp=j_perp, p=p, two_D=True, state=i)
-            print(f'for band {i}:')
-            print('computed 2D dispersion in {t:.3f}s'.format(t=perf_counter()-t0))
+        print('computed 2D dispersion in {t:.3f}s'.format(t=perf_counter()-t0))
         #print(f'E2D shape = {E_2D.shape}')
         if honeycomb == True:
             name = f'string_2hole_2D_disp_SU2_Honeycomb_depth{depth}_t{t}_t2{t2}_J{j}_Jperp{j_perp}_{state}bands_{stat}.npy'
@@ -1163,21 +1315,21 @@ def run(args):
 
 if __name__ == "__main__":
     args = {
-        "depth": 7,
+        "depth": 8,
         "j": 0.30,
         "j_perp": 0.30,
         "t": 1.0,
         "t2": 0,
         "fermions": True,
         "connected": True,  
-        "state": 5,
-        "grid_size": 2*np.pi,  
-        "points_2D": 120,
-        "points_1D": 60,
-        "honeycomb": False,
-        "big_unit_cell": False,
+        "state": 6,
+        "grid_size": 3.3,  
+        "points_2D": 67,
+        "points_1D": 180,
+        "honeycomb": True,
+        "big_unit_cell": True,
         "1D_disp": True,
-        "2D_disp": False,
+        "2D_disp": True,
         "all_2D_bands": False,
         "Magnetic_BZ": True
     }
