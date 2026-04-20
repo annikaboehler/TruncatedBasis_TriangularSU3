@@ -11,16 +11,16 @@ from helper_sc_cc_overlaps import *
 
 print("----------------- Setting up bases and system parameters -----------------")
 # define truncated bases for single and two hole channels, single hole: two basis for two sublattices
-l_sc = 3
-l_cc = 3
-l_max_sc_overlaps = 3
+l_sc = 4
+l_cc = 4
+l_max_sc_overlaps = 4
 
 lat_sc_1 = basis_sc(depth=l_sc, only_connected=False, initial_sl=0)
 lat_sc_2 = basis_sc(depth=l_sc, only_connected=False, initial_sl=1)
 lat_cc = basis_cc(depth=l_cc, only_connected=False)
 
 #define system parameters
-L = 50
+L = 100
 Lx, Ly = L, L
 j = 0.3
 j_perp = 0.3
