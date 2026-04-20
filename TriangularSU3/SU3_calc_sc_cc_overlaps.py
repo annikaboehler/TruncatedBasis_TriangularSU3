@@ -86,7 +86,7 @@ if lat_sc1.basis.length >1:
             else:
                 v1 = vs[:,0]
             #fix phase
-            n0 = find_l0_state(lat_sc1)
+            n0 = find_l0_state_sc1(lat_sc1)
             v1 = v1*np.exp(-1j*np.angle(v1[n0])) #changed v1[0] to v1[n0] to fix phase according to l0 state
             vs_sc_1.append(v1)
 
@@ -104,7 +104,7 @@ if lat_sc1.basis.length >1:
             else:
                 v2 = vs[:,0]
             #fix phase
-            n0 = find_l0_state(lat_sc2) #
+            n0 = find_l0_state_sc2(lat_sc2) 
             v2 = v2*np.exp(-1j*np.angle(v2[n0])) #changed v2[0] to v2[n0] to fix phase according to l0 state
             vs_sc_2.append(v2)
 

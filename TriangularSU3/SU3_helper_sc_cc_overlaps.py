@@ -36,7 +36,7 @@ def sum_ind(i, j, Lx, Ly=0):
         L = np.array([Lx, Ly]).reshape((2,) + (len(i.shape)-1)*(1,))
     return np.mod(np.round(i+j-L/2), L).astype(int)
 
-def find_l0_state(lat: Lat_sc1, n_max=7): #lower n_max for testing
+def find_l0_state_sc1(lat: Lat_sc1, n_max=7): #lower n_max for testing
     '''
     Find the first energy level which has considerable quasiparticle weight i.e. overlap with the zero string-length state.
                 #cc or sc?                                                                   cc or sc?
@@ -49,7 +49,28 @@ def find_l0_state(lat: Lat_sc1, n_max=7): #lower n_max for testing
     '''
     _, vs = lat.eigensys(n_max, full=True) # lat is Lat_sc, eigenstates up to n_max=7
     vs = np.abs(vs[:2, :])
-    n = 0
+    n= 0
+    while n <= n_max:
+        if vs[0, n] > vs[1, n] and vs[0, n] > 1e-4:
+            break
+        else:
+            n += 1
+    return n
+
+def find_l0_state_sc2(lat: Lat_sc2, n_max=7): #lower n_max for testing
+    '''
+    Find the first energy level which has considerable quasiparticle weight i.e. overlap with the zero string-length state.
+                #cc or sc?                                                                   cc or sc?
+    ARGUMENTS:
+    lat: Lat_sc: an instance of the sc lattice class, where the Hamiltonian has already been computed.
+    n_max : int (optional): the highest energy level considered
+
+    OUTPUT:
+    n: int: gives the number of the first energy level correspondig to the l=0 state. (n=0 corresponds to the ground state)
+    '''
+    _, vs = lat.eigensys(n_max, full=True) # lat is Lat_sc, eigenstates up to n_max=7
+    vs = np.abs(vs[:2, :])
+    n= 0
     while n <= n_max:
         if vs[0, n] > vs[1, n] and vs[0, n] > 1e-4:
             break
