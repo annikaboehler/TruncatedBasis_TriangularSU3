@@ -86,7 +86,7 @@ class StringBasis:
         self.triangular_Neel()
         self.generate_basis()
         self.order_basis()
-        # self.matrix_el()
+        self.matrix_el()
 
 
         self.data_t_test = []
@@ -135,22 +135,6 @@ class StringBasis:
         if self.honeycomb and self.big_unit_cell:
             x = np.sum(np.array(dist1))
             if x % 3 == 1:
-                dist1[0] += -1
-            elif x % 3 == 2:
-                dist1[0] += 1
-        elif not self.honeycomb and self.big_unit_cell:
-            z = np.sum(np.array(seq), axis=0, dtype=int)
-            z = (-np.sum(z)+1)%3
-            x,y = dist1[0]%3, dist1[1]%3
-            dist1[0] += (z-x-y)%3-z
-        return dist1
-    
-    def dist_2_uc_dist_annika(self,dist,seq):   #transforms distance on the square lattice into distance between corresponding unit cells
-        dist1 = dist.copy()
-        ## Honeycomb
-        if self.honeycomb and self.big_unit_cell:
-            x = np.sum(np.array(dist1))
-            if x % 3 == 1:
                 dist1[1] += -1
             elif x % 3 == 2:
                 dist1[1] += 1
@@ -163,21 +147,9 @@ class StringBasis:
     
     def dist_2_phys_dist(self,dist,seq):   #transforms square lattice with one diagonal coupling to triangular lattice (i,j) = (sqrt(3)/2*i, j - 1/2*i)
         phys_dist = np.zeros(2)
-        dist = self.dist_2_uc_dist_annika(dist,seq)
+        dist = self.dist_2_uc_dist(dist,seq)
         phys_dist[0], phys_dist[1] = np.sqrt(3)/2*dist[0], dist[1] - 1/2*dist[0]
         return phys_dist
-
-    # def g_2_r_hole(self, state):
-    #     lat = state['lat']
-    #     lat0 = lat.copy()
-    #     lat_red = (lat0+np.ones(self.L_size,dtype=int))%3
-    #     lat_red[self.depth+1,self.depth+1] = 0
-    #     # print('lat0',lat0)
-    #     # print('ones', np.ones(self.L_size,dtype=int))
-    #     # print('lat_red',lat_red)
-    #     state_red = copy.deepcopy(state)
-    #     state_red['lat'] = lat_red
-    #     return state_red
 
     def connected(self, state):     #done
         # state should be list of dictionary with keys 'lat', 'seq'

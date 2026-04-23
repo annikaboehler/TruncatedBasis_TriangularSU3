@@ -88,7 +88,7 @@ class StringBasis:
         self.triangular_Neel()
         self.generate_basis()
         self.order_basis()
-        #self.matrix_el()
+        self.matrix_el()
 
         self.data_t_test = []
         self.data = []
@@ -112,25 +112,25 @@ class StringBasis:
     def find_sublattice(self,state):
         seq = state['seq']
         y = np.sum(np.array(seq), axis=0, dtype=int)
-        y = (np.sum(y)+1)%3
+        y = (np.sum(y)+1)%3 #changed for red hole 
         sublattice = self.Neel_state[y]
         return sublattice
     
     def find_hole_sublattice(self,seq):    #linus 1.0
         x = np.sum(np.array(seq), axis=0, dtype=int)
-        x = (np.sum(x)+1)%3
+        x = (np.sum(x)+1)%3 #changed for red hole 
         return x
     
     def hole_is_on_2_sublattice(self,state):
         innit = False
         seq = state['seq']
         x = np.sum(np.array(seq), axis=0, dtype=int)
-        x = (np.sum(x)+1)%3
+        x = (np.sum(x)+1)%3 #changed for red hole
         if x == 2:
             innit = True
         return innit
     
-    def dist_2_uc_dist_annika(self,dist,seq):   #transforms distance on the square lattice into distance between corresponding unit cells
+    def dist_2_uc_dist(self,dist,seq):   #transforms distance on the square lattice into distance between corresponding unit cells
         dist1 = dist.copy()
         ## Honeycomb
         if self.honeycomb and self.big_unit_cell:
@@ -148,7 +148,7 @@ class StringBasis:
     
     def dist_2_phys_dist(self,dist,seq):   #transforms square lattice with one diagonal coupling to triangular lattice (i,j) = (sqrt(3)/2*i, j - 1/2*i)
         phys_dist = np.zeros(2)
-        dist = self.dist_2_uc_dist_annika(dist,seq)
+        dist = self.dist_2_uc_dist(dist,seq)
         phys_dist[0], phys_dist[1] = np.sqrt(3)/2*dist[0], dist[1] - 1/2*dist[0]
         return phys_dist
 
@@ -614,12 +614,12 @@ class StringBasis:
         return R
     
     def rot_trial_state(self, m3, k):
-        lat = self.Neel_state[0]
+        lat = self.Neel_state[1] #changed for red hole
         seq = []
         state0 = {'lat': lat, 'seq': seq}
         v = np.zeros((self.basis.length), dtype=complex)
         lat = np.zeros((self.L_size, self.L_size), dtype=bool)
-        steps = [[1,0], [0, 1], [-1, -1]] #hole 0 moves from sl 0 to 1
+        steps = [[-1,0], [0, -1], [1, 1]] #hole 0 moves from sl 1 to 0
         for n, step in enumerate(steps):
             state = copy.deepcopy(state0)
             lat = self.make_step(state['lat'], step)

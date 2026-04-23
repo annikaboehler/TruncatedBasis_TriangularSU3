@@ -87,7 +87,7 @@ class StringBasis:
         self.generate_basis()
         self.order_basis()
         self.generate_representatives()         #introducing representatives to make the holes distinguishable
-        #self.matrix_el()
+        self.matrix_el()
 
         self.data_t_test = []
         self.data = []
