@@ -30,8 +30,8 @@ xticks = [0, 60, 90, 120, 180]
 xlabels = ['$\Gamma$', 'K', 'M', "K'", '$\Gamma$']
 
 #load overlaps
-ops_sc = np.load(f"results/{system}/rot_overlaps_sc_depth=8_t={t}_j={j}_init_sl={initial_sl}.npy")
-ops_cc = np.load(f"results/{system}/rot_overlaps_cc_depth=8_t={t}_j={j}_jperp={j_perp}.npy")
+ops_sc = np.load(f"results/{system}/rot_overlaps_sc_depth={l_sc}_t={t}_j={j}_init_sl={initial_sl}.npy")
+ops_cc = np.load(f"results/{system}/rot_overlaps_cc_depth={l_cc}_t={t}_j={j}_jperp={j_perp}.npy")
 
 disp_sc = np.load(f"results/{system}/1D_dispersion_sc_path_GKMKpG_depth={l_sc}_t={t}_j={j}_init_sl={initial_sl}.npy")
 disp_cc = np.load(f"results/{system}/1D_dispersion_cc_path_GKMKpG_depth={l_cc}_t={t}_j={j}.npy")

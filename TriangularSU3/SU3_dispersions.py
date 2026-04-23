@@ -3,23 +3,29 @@ from scipy.sparse.linalg import eigsh
 from scipy.linalg import eigh
 from scipy.sparse import csr_matrix
 
-from HC_1_hole import StringBasisHC as basis_hc_1h
-from HC_2_holes import StringBasis as basis_hc_2h
+from importlib import reload
+import SU3_1hole_triangular
+import SU3_2hole_triangular
+reload(SU3_1hole_triangular)
+reload(SU3_2hole_triangular)
+from SU3_1hole_triangular import StringBasis as basis_tri_1h
+from SU3_2hole_triangular import StringBasis as basis_tri_2h
 
 
 #set system parameters
-l_sc = 1
-initial_sl = 0
-l_cc = 1
+l_sc = 7
+l_cc = 7
 n_bands = 6
 
 t = 1
 J = 0.3
 J_perp = 0.3
-
+unit_cell = None
+honeycomb = True
+system = 'SU2Hc' if honeycomb else 'SU3Tri'
 #define Krylov basis
-basis_1 = basis_hc_1h(depth=l_sc, only_connected=False, initial_sl=initial_sl)
-basis_2 = basis_hc_2h(depth=l_cc, only_connected=False)
+basis_1 = basis_tri_1h(depth=l_sc, only_connected=False, honeycomb=honeycomb, unit_cell=unit_cell)
+basis_2 = basis_tri_2h(depth=l_cc, only_connected=False, honeycomb=honeycomb, unit_cell=unit_cell)
 
 
 #choose k array
@@ -44,25 +50,25 @@ k_path = np.vstack((path1, path2, path3, path4))
 x1 = np.linspace(0,points_1D,k_path.shape[0])
 
 print("---------- calculating single hole disperion ------------")
-disp_1 = basis_1.dispersion(k_array=karray, two_D=True, j=J, t=t)
+disp_1,_ = basis_1.dispersion(k_array=karray, two_D=True, j=J, t=t)
 print("---------- calculating two hole disperion ------------")
-disp_2 = basis_2.dispersion(k_array=karray, two_D=True, j=J, t=t)
+disp_2,_ = basis_2.dispersion(k_array=karray, two_D=True, j=J, t=t)
 
-np.save(f"../results/HC/2D_dispersion_cc_depth={l_cc}_t={t}_j={J}_kmin={xlim[0]}_kmax={xlim[1]}.npy", disp_2)
-np.save(f"../results/HC/2D_dispersion_sc_depth={l_cc}_t={t}_j={J}_kmin={xlim[0]}_kmax={xlim[1]}_init_sl={initial_sl}.npy", disp_1)
+np.save(f"../results/TRI/{system}_2D_dispersion_cc_depth={l_cc}_t={t}_j={J}_uc={unit_cell}.npy", disp_2)
+np.save(f"../results/TRI/{system}_2D_dispersion_sc_depth={l_cc}_t={t}_j={J}_uc={unit_cell}.npy", disp_1)
 
 print("----------- calculating ", n_bands, " bands -----------------")
 disp_bands_sc = []
 disp_bands_cc = []
 for n in range(n_bands):
-    disp_cut_sc = basis_1.dispersion(k_path, two_D=False, j=J, t=t, state=n)
-    disp_cut_cc = basis_2.dispersion(k_path, two_D=False, j=J, t=t, state=n)
+    disp_cut_sc,_ = basis_1.dispersion(k_path, two_D=False, j=J, t=t, state=n)
+    disp_cut_cc,_ = basis_2.dispersion(k_path, two_D=False, j=J, t=t, state=n)
     disp_bands_sc.append(disp_cut_sc)
     disp_bands_cc.append(disp_cut_cc)
 disp_all_sc = np.array(disp_bands_sc)
 disp_all_cc = np.array(disp_bands_cc)
-np.save(f"../results/HC/1D_dispersion_sc_path_GKMKpG_depth={l_cc}_t={t}_j={J}_init_sl={initial_sl}.npy", disp_bands_sc)
-np.save(f"../results/HC/1D_dispersion_cc_path_GKMKpG_depth={l_cc}_t={t}_j={J}.npy", disp_bands_cc)
+np.save(f"../results/TRI/{system}_1D_dispersion_sc_path_GKMKpG_depth={l_cc}_t={t}_j={J}_uc={unit_cell}.npy", disp_bands_sc)
+np.save(f"../results/TRI/{system}_1D_dispersion_cc_path_GKMKpG_depth={l_cc}_t={t}_j={J}_uc={unit_cell}.npy", disp_bands_cc)
 
 print("----------- calculating rotational overlaps -----------------")
 #rotational overlaps
@@ -80,15 +86,15 @@ for i, k in enumerate(k_path):
         ol2 = np.dot(state, trial_state2.conj())
         ops[i,j, 2] = np.abs(ol2)**2
 ops = ops/np.max(ops)
-np.save(f"../results/HC/rot_overlaps_sc_depth={l_sc}_t={t}_j={J}_init_sl={initial_sl}.npy", ops)
+np.save(f"../results/TRI/{system}_rot_overlaps_sc_depth={l_sc}_t={t}_j={J}_uc={unit_cell}.npy", ops)
 
 
 disp_cut, evs = basis_2.dispersion_nmax(k_path, two_D=False, j=j, j_perp=J_perp, t=t, num_n=n_bands)
 ops = np.empty((disp_cut.shape[0], disp_cut.shape[1], 3), dtype=complex)
 for i, k in enumerate(k_path):
-    trial_state0 = basis_2.rot_trial_state_from_rep(m3=0, k=k, p=-1)
-    trial_state1 = basis_2.rot_trial_state_from_rep(m3=1, k=k, p=-1)
-    trial_state2 = basis_2.rot_trial_state_from_rep(m3=2, k=k, p=-1)
+    trial_state0 = basis_2.rot_trial_state(m3=0, k=k, p=-1)
+    trial_state1 = basis_2.rot_trial_state(m3=1, k=k, p=-1)
+    trial_state2 = basis_2.rot_trial_state(m3=2, k=k, p=-1)
     for j, state in enumerate(evs[i,:].T):
         ol0 = np.dot(state, trial_state0.conj())
         ops[i,j, 0] = np.abs(ol0)**2
@@ -97,4 +103,5 @@ for i, k in enumerate(k_path):
         ol2 = np.dot(state, trial_state2.conj())
         ops[i,j, 2] = np.abs(ol2)**2
 ops = ops/np.max(ops)
-np.save(f"../results/HC/rot_overlaps_cc_depth={l_cc}_t={t}_j={J}_jperp={J_perp}.npy", ops)
+np.save(f"../results/TRI/{system}_rot_overlaps_cc_depth={l_cc}_t={t}_j={J}_jperp={J_perp}_uc={unit_cell}.npy", ops)
+print("----------- finished calculations -----------------")

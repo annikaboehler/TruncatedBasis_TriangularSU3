@@ -25,7 +25,7 @@ from SU3_helper_sc_cc_overlaps  import *
 
 honeycomb = True
 system = 'SU2Hc' if honeycomb else 'SU3Tri'
-L=141
+L=101
 Ly = L
 Lx = L
 j = 0.3
@@ -44,30 +44,7 @@ c_p = 0.05
 delta_E = -0.1 #should be negative and not smaller then the sc bandwidth 
 
 # make k_grid
-g = np.array([[1/3, -1/3],[1/np.sqrt(3), 1/np.sqrt(3)]]) 
-size = 2*np.pi/np.sqrt(3) * L/(L-1)
-K_point = np.array([-2*np.pi/(3*np.sqrt(3)), -2*np.pi/(3)])
-
-def index2momentum(i, Lx, Ly=0, size=np.pi):    #returns momentum grid of size L, what is i?
-    if Ly==0:
-        L = Lx
-    else:
-        assert i.shape[0] == 2
-        L = np.array([Lx, Ly]).reshape((2,) + (len(i.shape)-1)*(1,))
-    return (size*(2*i/(L)-1)) 
-
-mom_ind = np.indices((L, L))
-k_grid = index2momentum(mom_ind, L, L, size=size)
-k_grid = k_grid + size/L
-rows, cols = np.indices(k_grid[0].shape) 
-mask1 = (rows + cols) >= L/2 - 1
-mask2 = (rows + cols) <= 3/2*L - 1 
-mask = mask1 & mask2
-
-k_x = k_grid[0][mask]
-k_y = k_grid[1][mask]
-k_grid = np.stack([k_x, k_y])
-k_grid = np.einsum('ij, jk -> ik', g, k_grid)
+k_grid = make_triangular_grid_bz(L)
 
 k_path = k_grid.T
 t0 = perf_counter()
@@ -75,7 +52,7 @@ lat_sc1 = StringBasis(depth_sc, connected, honeycomb, big_unit_cell=True)
 lat_sc1.matrix_el()
 sc_disp = np.zeros([1,len(k_path)])
 sc_disp, _ = lat_sc1.dispersion(k_path, two_D=False, state=1, t=t, t2=t2, j=j, j_perp=j_perp)
-    #print(f'band {i}: E = {E_1D[i]}')
+
 print('computed 1D dispersion in {t:.3f}s'.format(t=perf_counter()-t0))
 
 sc_disp
@@ -196,11 +173,12 @@ v_cc_1 = v_cc_1 * np.exp(-1j * np.angle(v_cc_1[0]))
 
  
 print("----------------- Calculating overlaps -----------------")
+print(f'depth_cc = {depth_cc}, depth_sc = {depth_sc}, l_max_sc_overlaps = {l_max_sc_overlaps}, L = {L}, k_cc = {k_cc}')
+
 print("1) t' overlaps")
  
 from tqdm import tqdm
 
-print(f'depth_cc = {depth_cc}, depth_sc = {depth_sc}, l_max_sc_overlaps = {l_max_sc_overlaps}, L = {L}, k_cc = {k_cc}')
 l_max = lat_cc.depth
 exchange = False
 hole_1_hop = True
@@ -591,7 +569,7 @@ for idx, ax in enumerate(axs_flat):
         ax.set_ylabel(r'$k_y$')
 
 plt.suptitle(fr'abs\angle $\Delta_k$ for $\mu={c_p}$, $\Delta E={delta_E}$', fontsize=22)
-plt.tight_layout(rect=[0, 0.03, 1, 0.96])
+plt.tight_layout()
 
 # 4. Save and Show
 plt.savefig(f'../results/figures/Deltak_{system}_Grid.pdf')

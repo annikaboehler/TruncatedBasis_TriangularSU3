@@ -24,13 +24,36 @@ def plot_lat(state, ax=None, end=False, fig=None, axs=None):
         plt.imshow(lat, vmin=0, vmax=1, cmap='RdPu')
         plt.show()
 
-def index2momentum(i, Lx, Ly=0):
+def index2momentum(i, Lx, Ly=0, size=np.pi):    #returns momentum grid of size L, what is i?
     if Ly==0:
         L = Lx
     else:
         assert i.shape[0] == 2
         L = np.array([Lx, Ly]).reshape((2,) + (len(i.shape)-1)*(1,))
-    return (1.2*np.pi*(2*i/(L)-1))
+    return (size*(2*i/(L)-1)) 
+
+def make_triangular_grid_bz(L,grid_size=None): 
+    'input L: odd integer'
+    'output k_grid: array of shape (2, N) with N=1+3/4(L^2-1) k-points on hexagonal grid'
+    size = 2*np.pi/np.sqrt(3) * L/(L-1)
+    if grid_size != None:
+        size = grid_size
+
+    g = np.array([[1/3, -1/3],[1/np.sqrt(3), 1/np.sqrt(3)]])
+
+    mom_ind = np.indices((L, L))
+    k_grid = index2momentum(mom_ind, L, L, size=size)
+    k_grid = k_grid + size/L
+    rows, cols = np.indices(k_grid[0].shape) 
+    mask1 = (rows + cols) >= L/2 - 1
+    mask2 = (rows + cols) <= 3/2*L - 1 
+    mask = mask1 & mask2
+
+    k_x = k_grid[0][mask]
+    k_y = k_grid[1][mask]
+    k_grid = np.stack([k_x, k_y])
+    k_grid = np.einsum('ij, jk -> ik', g, k_grid)
+    return k_grid
 
 def sum_ind(i, j, Lx, Ly=0):
     if Ly==0:
