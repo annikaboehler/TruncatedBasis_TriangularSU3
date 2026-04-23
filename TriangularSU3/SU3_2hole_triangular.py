@@ -58,7 +58,7 @@ class sorted_list:
 
 class StringBasis:
 # A class for generating a truncated basis
-    def __init__(self, depth, only_connected=True, honeycomb=False, big_unit_cell=True):  # works only for depth<=14 otherwise change uint32 to uint64!
+    def __init__(self, depth, only_connected=True, honeycomb=False, unit_cell=0):  # works only for depth<=14 otherwise change uint32 to uint64!
         self.depth = depth
         self.L_size = 2*self.depth+3
         self.basis = sorted_list(length_arr = self.L_size + 2)
@@ -78,7 +78,13 @@ class StringBasis:
         self.is_representative = []
         self.only_connected = only_connected
         self.honeycomb = honeycomb
-        self.big_unit_cell = big_unit_cell
+        self.unit_cell = unit_cell
+        if unit_cell is None:
+            self.big_unit_cell = False
+        elif isinstance(unit_cell, int):
+            self.big_unit_cell = True
+        print(f'2hole big_unit_cell={self.big_unit_cell}, unit_cell={unit_cell}')
+        
         
         self.tol=0
         self.Neel_state_L_size = []
@@ -164,41 +170,62 @@ class StringBasis:
         
         return innit
     
-    def dist_2_uc_dist(self,dist,seq):   #transforms distance on the square lattice into distance between corresponding unit cells
+    def dist_2_uc_dist0(self,dist,seq):   # horizontal unit cell
         dist1 = dist.copy()
-        if self.honeycomb and self.big_unit_cell:
-            x = np.sum(np.array(dist1))
-            if x % 3 == 1:
-                dist1[0] += -1
-            elif x % 3 == 2:
-                dist1[0] += 1
-        elif not self.honeycomb and self.big_unit_cell:
-            z,_ = self.find_hole_sublattice(seq)
-            z = (-z+1)%3
-            x,y = dist1[0]%3, dist1[1]%3
-            dist1[0] += (z-x-y)%3-z
-        return dist1
-    
-    def dist_2_uc_dist_annika(self,dist,seq):   #transforms distance on the square lattice into distance between corresponding unit cells
-        dist1 = dist.copy()
-        ## Honeycomb
-        if self.honeycomb and self.big_unit_cell:
+        if self.honeycomb:
             x = np.sum(np.array(dist1))
             if x % 3 == 1:
                 dist1[1] += -1
             elif x % 3 == 2:
                 dist1[1] += 1
-        elif not self.honeycomb and self.big_unit_cell:
-            z,_ = self.find_hole_sublattice(seq)
-            z = (-z+1)%3
+        elif not self.honeycomb:
+            z = np.sum(np.array(seq), axis=0, dtype=int)
+            z = (-np.sum(z)+1)%3
             x,y = dist1[0]%3, dist1[1]%3
             dist1[1] += (z-x-y)%3-z
         return dist1
     
-    def dist_2_phys_dist(self,dist,seq,sl=False):   #transforms square lattice with one diagonal coupling to triangular lattice (i,j) = (sqrt(3)/2*i, j - 1/2*i)
+    def dist_2_uc_dist1(self,dist,seq):   # vertical unit cell, only honeycomb uc adjusted
+        dist1 = dist.copy()
+        if self.honeycomb:
+            x = np.sum(np.array(dist1))
+            if x % 3 == 1:
+                dist1[0] += -1
+            elif x % 3 == 2:
+                dist1[0] += 1
+        elif not self.honeycomb:
+            z = np.sum(np.array(seq), axis=0, dtype=int)
+            z = (-np.sum(z)+1)%3
+            x,y = dist1[0]%3, dist1[1]%3
+            dist1[1] += (z-x-y)%3-z
+        return dist1
+    
+    def dist_2_uc_dist2(self,dist,seq):  # diagonal unit cell, only honeycomb uc adjusted
+        dist1 = dist.copy()
+        if self.honeycomb:
+            x = np.sum(np.array(dist1))
+            if x % 3 == 1:
+                dist1[0] += 1
+                dist1[1] += 1
+            elif x % 3 == 2:
+                dist1[0] -= 1
+                dist1[1] -= 1
+        elif not self.honeycomb:
+            z = np.sum(np.array(seq), axis=0, dtype=int)
+            z = (-np.sum(z)+1)%3
+            x,y = dist1[0]%3, dist1[1]%3
+            dist1[1] += (z-x-y)%3-z
+        return dist1
+    
+    def dist_2_phys_dist(self,dist,seq):   #transforms square lattice with one diagonal coupling to triangular lattice (i,j) = (sqrt(3)/2*i, j - 1/2*i)
         phys_dist = np.zeros(2)
-        if not sl:
-            dist = self.dist_2_uc_dist_annika(dist,seq)
+        if self.big_unit_cell:
+            if self.unit_cell == 0:
+                dist = self.dist_2_uc_dist0(dist,seq)
+            elif self.unit_cell == 1:
+                dist = self.dist_2_uc_dist1(dist,seq)
+            elif self.unit_cell == 2:
+                dist = self.dist_2_uc_dist2(dist,seq)
         phys_dist[0], phys_dist[1] = np.sqrt(3)/2*dist[0], dist[1] - 1/2*dist[0]
         return np.array(phys_dist)
     

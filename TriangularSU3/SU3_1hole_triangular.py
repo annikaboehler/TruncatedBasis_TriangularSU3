@@ -67,7 +67,7 @@ class sorted_list:
 
 class StringBasis:
 # A class for generating a truncated basis
-    def __init__(self, depth, only_connected=True, honeycomb=False, big_unit_cell=True):  # works only for depth<=14 otherwise change uint32 to uint64!
+    def __init__(self, depth, only_connected=True, honeycomb=False, unit_cell=0):  # works only for depth<=14 otherwise change uint32 to uint64!
         self.depth = depth
         self.L_size = 2*self.depth+3 
         self.Neel_state = []
@@ -78,9 +78,15 @@ class StringBasis:
         self.H = None
 
         self.honeycomb = honeycomb
-        self.big_unit_cell = big_unit_cell
         self.only_connected = only_connected
-        
+
+        self.unit_cell = unit_cell
+        if unit_cell is None:
+            self.big_unit_cell = False
+        elif isinstance(unit_cell, int):
+            self.big_unit_cell = True
+        print(f'1hole big_unit_cell={self.big_unit_cell}, unit_cell={unit_cell}')
+
         self.tol = 0
 
         self.triangular_Neel()
@@ -115,7 +121,7 @@ class StringBasis:
         sublattice = self.Neel_state[y]
         return sublattice
     
-    def find_hole_sublattice(self,seq):      #linus 1.0
+    def find_hole_sublattice(self,seq): 
         x = np.sum(np.array(seq), axis=0, dtype=int)
         x = (np.sum(x))%3
         return x
@@ -129,16 +135,47 @@ class StringBasis:
             innit = True
         return innit
     
-    def dist_2_uc_dist(self,dist,seq):   #transforms distance on the square lattice into distance between corresponding unit cells
+    def dist_2_uc_dist0(self,dist,seq):   # horizontal unit cell
         dist1 = dist.copy()
-        ## Honeycomb
-        if self.honeycomb and self.big_unit_cell:
+        if self.honeycomb:
             x = np.sum(np.array(dist1))
             if x % 3 == 1:
                 dist1[1] += -1
             elif x % 3 == 2:
                 dist1[1] += 1
-        elif not self.honeycomb and self.big_unit_cell:
+        elif not self.honeycomb:
+            z = np.sum(np.array(seq), axis=0, dtype=int)
+            z = (-np.sum(z)+1)%3
+            x,y = dist1[0]%3, dist1[1]%3
+            dist1[1] += (z-x-y)%3-z
+        return dist1
+    
+    def dist_2_uc_dist1(self,dist,seq):   # vertical unit cell, only honeycomb uc adjusted
+        dist1 = dist.copy()
+        if self.honeycomb:
+            x = np.sum(np.array(dist1))
+            if x % 3 == 1:
+                dist1[0] += -1
+            elif x % 3 == 2:
+                dist1[0] += 1
+        elif not self.honeycomb:
+            z = np.sum(np.array(seq), axis=0, dtype=int)
+            z = (-np.sum(z)+1)%3
+            x,y = dist1[0]%3, dist1[1]%3
+            dist1[1] += (z-x-y)%3-z
+        return dist1
+    
+    def dist_2_uc_dist2(self,dist,seq):  # diagonal unit cell, only honeycomb uc adjusted
+        dist1 = dist.copy()
+        if self.honeycomb:
+            x = np.sum(np.array(dist1))
+            if x % 3 == 1:
+                dist1[0] += 1
+                dist1[1] += 1
+            elif x % 3 == 2:
+                dist1[0] -= 1
+                dist1[1] -= 1
+        elif not self.honeycomb:
             z = np.sum(np.array(seq), axis=0, dtype=int)
             z = (-np.sum(z)+1)%3
             x,y = dist1[0]%3, dist1[1]%3
@@ -147,11 +184,17 @@ class StringBasis:
     
     def dist_2_phys_dist(self,dist,seq):   #transforms square lattice with one diagonal coupling to triangular lattice (i,j) = (sqrt(3)/2*i, j - 1/2*i)
         phys_dist = np.zeros(2)
-        dist = self.dist_2_uc_dist(dist,seq)
+        if self.big_unit_cell:
+            if self.unit_cell == 0:
+                dist = self.dist_2_uc_dist0(dist,seq)
+            elif self.unit_cell == 1:
+                dist = self.dist_2_uc_dist1(dist,seq)
+            elif self.unit_cell == 2:
+                dist = self.dist_2_uc_dist2(dist,seq)
         phys_dist[0], phys_dist[1] = np.sqrt(3)/2*dist[0], dist[1] - 1/2*dist[0]
         return phys_dist
 
-    def connected(self, state):     #done
+    def connected(self, state): 
         # state should be list of dictionary with keys 'lat', 'seq'
         res = False
         lat = state['lat']      
@@ -670,7 +713,7 @@ class StringBasis:
         return v
 # -----------------------------------------------------------------------------------
 
-def run(args):
+def run(args, Costum_k_path=False, Path=None):
     depth = args["depth"]
     t = args["t"]
     t2 = args["t2"]
@@ -682,7 +725,7 @@ def run(args):
     grid_size = args["grid_size"]
     points_1D = args["points_1D"]
     honeycomb = args["honeycomb"]
-    big_unit_cell = args["big_unit_cell"]
+    unit_cell = args["unit_cell"]
     D1 = args["1D_disp"]
     D2 = args["2D_disp"]
     honeycomb = args["honeycomb"]
@@ -691,8 +734,9 @@ def run(args):
 
     ### Create string basis
     t0 = perf_counter()
-    sb = StringBasis(depth, connected, honeycomb, big_unit_cell)
-    print('coefficients:',depth, j, j_perp, t, t2, connected, state, grid_size, points_2D, points_1D, honeycomb, big_unit_cell)
+    sb = StringBasis(depth, connected, honeycomb, unit_cell)
+    # print('coefficients:',depth, j, j_perp, t, t2, connected, state, grid_size, points_2D, points_1D, honeycomb, eunit_cell)
+    print(f'coefficients:,depth={depth},j={j},j_perp={j_perp},t={t},t2={t2},connected={connected},state={state},grid_size={grid_size},points_2D={points_2D},points_1D={points_1D},honeycomb={honeycomb},unit_cell={unit_cell}')
     print('created String Basis in {t:.3f}s \n'.format(t=perf_counter()-t0))
     
     t0 = perf_counter()
@@ -720,12 +764,19 @@ def run(args):
     path_data = '/Users/linushein/Documents/Python/Python_output/SU(3)_truncated2'
 
     if D1 == True:
+        if Costum_k_path:
+            k_path=Path.T
+        # print(f'k_grid shape:{k_path.shape}')
+        # print(f'k_grid len:{len(k_path)}')
         t0 = perf_counter()
         E_1D = np.zeros([state,len(k_path)])
         for i in range(state):
             E_1D[i], _ = sb.dispersion(k_path, two_D=False, state=i, t=t, t2=t2, j=j, j_perp=j_perp)
             #print(f'band {i}: E = {E_1D[i]}')
         print('computed 1D dispersion in {t:.3f}s'.format(t=perf_counter()-t0))
+        # print(f'E_1D shape: {E_1D.shape}')  
+        # if Custom_k_path:
+        #     E_1D=E_1D.T
         if honeycomb == True:
             name2 = f'string_1hole_1D_disp_SU2_Honeycomb_depth{depth}_t{t}_t2{t2}_J{j}_Jperp{j_perp}_{state}bands.npy'
         else:
@@ -764,10 +815,13 @@ if __name__ == "__main__":
         "points_2D": 120,
         "points_1D": 60,
         "honeycomb": True,
-        "big_unit_cell": False,
+        "unit_cell": 0,
         "1D_disp": True,
         "2D_disp": False,
         "all_2D_bands": True,
-        "Magnetic_BZ": True
+        "Magnetic_BZ": True,
     }
     run(args)
+
+
+
