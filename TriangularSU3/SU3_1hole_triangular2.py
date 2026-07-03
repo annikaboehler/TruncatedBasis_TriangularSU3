@@ -182,16 +182,21 @@ class StringBasis:
         return dist1
     
     def dist_2_phys_dist(self,dist,seq):   #transforms square lattice with one diagonal coupling to triangular lattice (i,j) = (sqrt(3)/2*i, j - 1/2*i)
+        # to acces all three gauges: C3 rotate dist, apply dist_2_uc_dist0, rotate back
         phys_dist = np.zeros(2)
         if self.big_unit_cell:
             if self.unit_cell == 0:
                 dist = self.dist_2_uc_dist0(dist,seq)
             elif self.unit_cell == 1:
-                dist = self.dist_2_uc_dist1(dist,seq)
+                dist = [-dist[1],dist[0]-dist[1]]
+                dist = self.dist_2_uc_dist0(dist,seq)
+                dist = [dist[1]-dist[0],-dist[0]]
             elif self.unit_cell == 2:
-                dist = self.dist_2_uc_dist2(dist,seq)
+                dist = [dist[1]-dist[0],-dist[0]]
+                dist = self.dist_2_uc_dist0(dist,seq)
+                dist = [-dist[1],dist[0]-dist[1]]
         phys_dist[0], phys_dist[1] = np.sqrt(3)/2*dist[0], dist[1] - 1/2*dist[0]
-        return phys_dist
+        return np.array(phys_dist)
 
     def connected(self, state):     #done
         # state should be list of dictionary with keys 'lat', 'seq'
