@@ -1,0 +1,106 @@
+team_name: truncated-basis-agent-team
+project: TruncatedBasis_TriangularSU3
+team_goal: >
+  Understand, extend, and stabilize a truncated-basis / geometric-string codebase
+  spanning Honeycomb SU(2) and Triangular SU(3), with strong alignment between
+  paper-level physics and implementation details.
+
+shared_rules:
+  - Preserve the distinction between paper logic and implemented logic.
+  - Use the terms geometric string, truncated string basis, sc, cc, meson,
+    ro-vibrational excitation, and Trugman loop consistently.
+  - Do not assume square-lattice symmetry labels transfer unchanged to
+    honeycomb or SU(3).
+  - Treat Honeycomb SU(2) as the numerically more mature branch.
+  - Treat Triangular SU(3) as the more experimental branch with active
+    interface consolidation still needed.
+  - When in doubt, surface which part of a conclusion is grounded in code,
+    which part is grounded in the papers, and which part is an inference.
+
+agents:
+  - id: physics-foundations
+    file: agents/physics-foundations.md
+    mission: Translate the three papers into project-local physics guidance.
+    primary_inputs:
+      - main copy.tex
+      - Magnons_AFM-arxiv.tex
+      - main.tex
+    handoff_to:
+      - honeycomb-core
+      - honeycomb-symmetry-debugger
+      - su3-basis-builder
+      - channel-coupling
+
+  - id: honeycomb-core
+    file: agents/honeycomb-core.md
+    mission: Own the production Honeycomb SU(2) basis and Hamiltonian code.
+    primary_inputs:
+      - HoneycombSU2/HC_1_hole.py
+      - HoneycombSU2/HC_2_holes.py
+      - HoneycombSU2/dispersions.py
+    handoff_to:
+      - honeycomb-symmetry-debugger
+      - channel-coupling
+      - numerics-and-repro
+
+  - id: honeycomb-symmetry-debugger
+    file: agents/honeycomb-symmetry-debugger.md
+    mission: Resolve C3, gauge, and rotation-block issues in Honeycomb SU(2).
+    primary_inputs:
+      - HoneycombSU2/check_c3_overlap.py
+      - HoneycombSU2/debug_*/
+    handoff_to:
+      - honeycomb-core
+      - channel-coupling
+      - numerics-and-repro
+
+  - id: su3-basis-builder
+    file: agents/su3-basis-builder.md
+    mission: Consolidate and extend the Triangular SU(3) basis classes.
+    primary_inputs:
+      - TriangularSU3/SU3_1hole_triangular.py
+      - TriangularSU3/SU3_1hole_triangular2.py
+      - TriangularSU3/SU3_2hole_triangular.py
+    handoff_to:
+      - channel-coupling
+      - numerics-and-repro
+
+  - id: channel-coupling
+    file: agents/channel-coupling.md
+    mission: Own sc-cc overlaps, form factors, and effective channel coupling.
+    primary_inputs:
+      - HoneycombSU2/calc_sc_cc_overlaps.py
+      - HoneycombSU2/helper_sc_cc_overlaps.py
+      - TriangularSU3/SU3_sc_cc_overlap.py
+    handoff_to:
+      - honeycomb-core
+      - honeycomb-symmetry-debugger
+      - su3-basis-builder
+      - numerics-and-repro
+
+  - id: numerics-and-repro
+    file: agents/numerics-and-repro.md
+    mission: Make runs reproducible, paths portable, and outputs easy to trust.
+    primary_inputs:
+      - plot_dispersions.py
+      - plot_rot_overlaps.py
+      - results/
+    handoff_to:
+      - honeycomb-core
+      - honeycomb-symmetry-debugger
+      - su3-basis-builder
+      - channel-coupling
+
+recommended_first_wave:
+  - physics-foundations: Produce a square-to-honeycomb and SU(2)-to-SU(3)
+      transfer map of what can be reused and what must be rederived.
+  - honeycomb-core: Audit the current production solver path and identify
+      low-risk cleanup separate from symmetry debugging.
+  - honeycomb-symmetry-debugger: Reduce the current C3 issue to a smallest
+      reproducible example with a fixed gauge convention.
+  - su3-basis-builder: Unify the duplicated single-hole code paths and make the
+      basis interfaces consistent.
+  - channel-coupling: Define a single input/output contract for overlap code on
+      both lattice branches.
+  - numerics-and-repro: Remove machine-specific paths and create a stable run
+      recipe for figures and overlap outputs.
