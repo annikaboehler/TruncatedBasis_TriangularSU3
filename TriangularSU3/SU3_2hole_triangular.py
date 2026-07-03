@@ -179,8 +179,8 @@ class StringBasis:
             elif x % 3 == 2:
                 dist1[1] += 1
         elif not self.honeycomb:
-            z = np.sum(np.array(seq), axis=0, dtype=int)
-            z = (-np.sum(z)+1)%3
+            z,_ = self.find_hole_sublattice(seq)
+            z = (-z+1)%3
             x,y = dist1[0]%3, dist1[1]%3
             dist1[1] += (z-x-y)%3-z
         return dist1
@@ -194,8 +194,8 @@ class StringBasis:
             elif x % 3 == 2:
                 dist1[0] += 1
         elif not self.honeycomb:
-            z = np.sum(np.array(seq), axis=0, dtype=int)
-            z = (-np.sum(z)+1)%3
+            z,_ = self.find_hole_sublattice(seq)
+            z = (-z+1)%3
             x,y = dist1[0]%3, dist1[1]%3
             dist1[1] += (z-x-y)%3-z
         return dist1
@@ -211,8 +211,8 @@ class StringBasis:
                 dist1[0] -= 1
                 dist1[1] -= 1
         elif not self.honeycomb:
-            z = np.sum(np.array(seq), axis=0, dtype=int)
-            z = (-np.sum(z)+1)%3
+            z,_ = self.find_hole_sublattice(seq)
+            z = (-z+1)%3
             x,y = dist1[0]%3, dist1[1]%3
             dist1[1] += (z-x-y)%3-z
         return dist1
@@ -1094,10 +1094,7 @@ class StringBasis:
                     # phase = self.f(x,y)*a
                     phase_t = -self.g(x)*a
                 if not rep:
-                    #print('not rep')
                     a = self.dist_2_phys_dist(hole_pos[1] - self.depth - 1, seq)
-                    # print(f'a = {a}')
-                    # print(self.representatives[j]['seq'])
                     phase = -1 * (a[0]*k[0]+a[1]*k[1]) + (p<0) * np.pi + phase_t
                 v[j] += 1/np.sqrt(3) * np.exp(1j * m3 * n * 2*np.pi/3 + 1j*phase) 
         return v
@@ -1265,7 +1262,7 @@ def run(args):
     grid_size = args["grid_size"]
     points_1D = args["points_1D"]
     honeycomb = args["honeycomb"]
-    big_unit_cell = args["big_unit_cell"]
+    unit_cell = args["unit_cell"]
     D1 = args["1D_disp"]
     D2 = args["2D_disp"]
     all_2D_bands = args["all_2D_bands"]
@@ -1274,8 +1271,8 @@ def run(args):
 
     ### Create string basis
     t0 = perf_counter()
-    sb = StringBasis(depth, connected, honeycomb, big_unit_cell)
-    print('coefficients:',depth, j, j_perp, t, t2, connected, state, grid_size, points_2D, points_1D, honeycomb, big_unit_cell)
+    sb = StringBasis(depth, connected, honeycomb, unit_cell)
+    print('coefficients:',depth, j, j_perp, t, t2, connected, state, grid_size, points_2D, points_1D, honeycomb, unit_cell)
     print('created String Basis in {t:.3f}s \n'.format(t=perf_counter()-t0))
     
     t0 = perf_counter()
@@ -1354,7 +1351,7 @@ if __name__ == "__main__":
         "points_2D": 67,
         "points_1D": 180,
         "honeycomb": True,
-        "big_unit_cell": True,
+        "unit_cell": True,
         "1D_disp": True,
         "2D_disp": True,
         "all_2D_bands": False,
