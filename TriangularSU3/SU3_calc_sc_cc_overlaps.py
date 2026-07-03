@@ -27,10 +27,11 @@ from SU3_helper_sc_cc_overlaps  import *
 "decide if you want to calculate honeycomb or triangular lattice overlaps and other relevant parameters here:"
 honeycomb = True
 system = 'SU2Hc' if honeycomb else 'SU3Tri'
-connected =True
-depth_sc = 3
-depth_cc = 3
-l_max_sc_overlaps = 3
+connected = True
+unit_cell = 0
+depth_sc = 4
+depth_cc = 4
+l_max_sc_overlaps = 4
 L=50
 
 size = 1.2*np.pi 
@@ -43,8 +44,8 @@ t = 1
 
 print(f'depth_cc = {depth_cc}, depth_sc = {depth_sc}, l_max_sc_overlaps = {l_max_sc_overlaps}, L = {L}, k_cc = {k_cc}')
 
-lat_sc1 = Lat_sc1(depth_sc, only_connected=connected, honeycomb=honeycomb)
-lat_sc2 = Lat_sc2(depth_sc, only_connected=connected, honeycomb=honeycomb)
+lat_sc1 = Lat_sc1(depth_sc, only_connected=connected, honeycomb=honeycomb, unit_cell=unit_cell)
+lat_sc2 = Lat_sc2(depth_sc, only_connected=connected, honeycomb=honeycomb, unit_cell=unit_cell)
 lat_sc1.matrix_el() 
 lat_sc2.matrix_el() 
 

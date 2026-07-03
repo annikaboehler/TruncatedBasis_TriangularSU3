@@ -4,14 +4,17 @@ import sys
 
 #set system parameters
 l_sc = 6
-initial_sl = 0
 l_cc = 6
 
 t = 1
 j = 0.3
 j_perp = 0.3
 
-system = 'HC' #'Tri'
+honeycomb = True
+unit_cell = 1
+
+Code = 'TRI'
+system = 'SU2Hc' if honeycomb else 'SU3Tri'
 
 #K space values
 K = 4*np.pi/(3*np.sqrt(3))*np.array([1, 0])
@@ -27,31 +30,35 @@ path4 = np.linspace(Kp, Gamma, int(points_1D/3)+1)
 k_path = np.vstack((path1, path2, path3, path4))
 x1 = np.linspace(0,points_1D,k_path.shape[0])
 xticks = [0, 60, 90, 120, 180]
-xlabels = ['$\Gamma$', 'K', 'M', "K'", '$\Gamma$']
+xlabels = ['$\\Gamma$', 'K', 'M', "K'", '$\\Gamma$']
 
 #load overlaps
-ops_sc = np.load(f"results/{system}/rot_overlaps_sc_depth={l_sc}_t={t}_j={j}_init_sl={initial_sl}.npy")
-ops_cc = np.load(f"results/{system}/rot_overlaps_cc_depth={l_cc}_t={t}_j={j}_jperp={j_perp}.npy")
+ops_sc = np.load(f"results/{Code}/{system}_rot_overlaps_sc_depth={l_sc}_t={t}_j={j}_uc={unit_cell}.npy")
+ops_cc = np.load(f"results/{Code}/{system}_rot_overlaps_cc_depth={l_cc}_t={t}_j={j}_jperp={j_perp}_uc={unit_cell}.npy")
 
-disp_sc = np.load(f"results/{system}/1D_dispersion_sc_path_GKMKpG_depth={l_sc}_t={t}_j={j}_init_sl={initial_sl}.npy")
-disp_cc = np.load(f"results/{system}/1D_dispersion_cc_path_GKMKpG_depth={l_cc}_t={t}_j={j}.npy")
+disp_sc = np.load(f"results/{Code}/{system}_1D_dispersion_sc_path_GKMKpG_depth={l_sc}_t={t}_j={j}_uc={unit_cell}.npy")
+disp_cc = np.load(f"results/{Code}/{system}_1D_dispersion_cc_path_GKMKpG_depth={l_cc}_t={t}_j={j}_uc={unit_cell}.npy")
 x1 = np.repeat(x1, disp_sc.shape[0])
 
-fig, axs = plt.subplots(1,3, figsize=(15,3.5))
+fig, axs = plt.subplots(1,3, figsize=(15,5))
 for i in range(3):
     axs[i].scatter(x1, disp_sc.T, marker='o', alpha=np.real(ops_sc[:,:,i]))
     axs[i].set_title('$m_3=$'+str(i), size=16)
     axs[i].grid()
     axs[i].set_xticks(xticks, xlabels, size=14)
 axs[0].set_ylabel('$E_0/t$', size=16)
-plt.savefig(f'results/figures/{system}_rot_overlaps_sc_depth={l_sc}_t={t}_j={j}.pdf', bbox_inches='tight')
+plt.suptitle(fr'sc rotational overlap for unit cell: {unit_cell}',size=18)
+plt.tight_layout()
+plt.savefig(f'results/figures/{Code}_{system}_rot_overlaps_sc_depth={l_sc}_t={t}_j={j}_uc={unit_cell}.pdf', bbox_inches='tight')
 
-fig, axs = plt.subplots(1,3, figsize=(15,3.5))
+fig, axs = plt.subplots(1,3, figsize=(15,5))
 for i in range(3):
     axs[i].scatter(x1, disp_cc.T, marker='o', alpha=np.real(ops_cc[:,:,i]))
     axs[i].set_title('$m_3=$'+str(i), size=16)
     axs[i].grid()
     axs[i].set_xticks(xticks, xlabels, size=14)
 axs[0].set_ylabel('$E_0/t$', size=16)
-plt.savefig(f'results/figures/{system}_rot_overlaps_cc_depth={l_cc}_t={t}_j={j}_jperp={j_perp}.pdf', bbox_inches='tight')
-print("finished plotting")
+plt.suptitle(fr'cc rotational overlap for unit cell: {unit_cell}',size=18)
+plt.tight_layout()
+plt.savefig(f'results/figures/{Code}_{system}_rot_overlaps_cc_depth={l_cc}_t={t}_j={j}_uc={unit_cell}.pdf', bbox_inches='tight')
+print("----------- finished plotting -----------------")

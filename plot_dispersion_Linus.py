@@ -3,14 +3,14 @@ import matplotlib.pyplot as plt
 import sys
 
 #set system parameters
-l_sc = 7
-l_cc = 7
+l_sc = 6
+l_cc = 6
 
 t = 1
 j = 0.3
 j_perp = 0.3
 honeycomb = True
-unit_cell = None
+unit_cell = 1
 
 
 Code = 'TRI'
@@ -35,12 +35,12 @@ path4 = np.linspace(Kp, Gamma, int(points_1D/3)+1)
 k_path = np.vstack((path1, path2, path3, path4))
 x1 = np.linspace(0,points_1D,k_path.shape[0])
 xticks = [0, 60, 90, 120, 180]
-xlabels = ['$\Gamma$', 'K', 'M', "K'", '$\Gamma$']
+xlabels = ['$\\Gamma$', 'K', 'M', "K'", '$\\Gamma$']
 
 #load 2D dispersions
 print("loading & plotting 2D dispersions ...")
-disp_sc = np.load(f"results/{Code}/{system}_2D_dispersion_sc_depth={l_sc}_t={t}_j={j}.npy")
-disp_cc = np.load(f"results/{Code}/{system}_2D_dispersion_cc_depth={l_sc}_t={t}_j={j}.npy")
+disp_sc = np.load(f"results/{Code}/{system}_2D_dispersion_sc_depth={l_sc}_t={t}_j={j}_uc={unit_cell}.npy")
+disp_cc = np.load(f"results/{Code}/{system}_2D_dispersion_cc_depth={l_sc}_t={t}_j={j}_uc={unit_cell}.npy")
 
 #plot dispersions
 fig, axs = plt.subplots(1,2, figsize=(15,5))
@@ -82,12 +82,12 @@ axs[1].annotate('K', (K[0], K[1]), size=15)
 axs[1].annotate("K'", (Kp[0], Kp[1]), size=15)
 axs[1].annotate('M', (M[0], M[1]), size=15)
 axs[1].set_title('cc', size=14)
-plt.savefig(f'results/figures/{Code}_{system}_dispersions_full_BZ_sc_depth={l_sc}_cc_depth={l_cc}_t={t}_j={j}.pdf', bbox_inches='tight')
+plt.savefig(f'results/figures/{Code}_{system}_dispersions_full_BZ_sc_depth={l_sc}_cc_depth={l_cc}_t={t}_j={j}_uc={unit_cell}.pdf', bbox_inches='tight')
 
 #plot band structure
 print("loading & plotting 1D bandstructure ...")
-disp_sc = np.load(f"results/{Code}/{system}_1D_dispersion_sc_path_GKMKpG_depth={l_sc}_t={t}_j={j}.npy")
-disp_cc = np.load(f"results/{Code}/{system}_1D_dispersion_cc_path_GKMKpG_depth={l_cc}_t={t}_j={j}.npy")
+disp_sc = np.load(f"results/{Code}/{system}_1D_dispersion_sc_path_GKMKpG_depth={l_sc}_t={t}_j={j}_uc={unit_cell}.npy")
+disp_cc = np.load(f"results/{Code}/{system}_1D_dispersion_cc_path_GKMKpG_depth={l_cc}_t={t}_j={j}_uc={unit_cell}.npy")
 x1 = np.repeat(x1, disp_sc.shape[0]).reshape(x1.shape[0], disp_sc.shape[0])
 
 fig, axs = plt.subplots(1,2,  figsize=(10,5))
@@ -99,7 +99,8 @@ axs[0].set_xticks(xticks, xlabels, size=16)
 axs[1].grid()
 axs[1].set_xticks(xticks, xlabels, size=16)
 
-plt.savefig(f'results/figures/{Code}_{system}_1D_bandstructure_GKMKpG_sc_depth={l_sc}_cc_depth={l_cc}_t={t}_j={j}.pdf', bbox_inches='tight')
-plt.show()
+plt.savefig(f'results/figures/{Code}_{system}_1D_bandstructure_GKMKpG_sc_depth={l_sc}_cc_depth={l_cc}_t={t}_j={j}_uc={unit_cell}.pdf', bbox_inches='tight')
+print(f'results/figures/{Code}_{system}_1D_bandstructure_GKMKpG_sc_depth={l_sc}_cc_depth={l_cc}_t={t}_j={j}_uc={unit_cell}.pdf')
+
 
 print("----------- finished plotting -----------------")

@@ -662,54 +662,21 @@ class StringBasis:
         state0 = {'lat': lat, 'seq': seq}
         v = np.zeros((self.basis.length), dtype=complex)
         lat = np.zeros((self.L_size, self.L_size), dtype=bool)
-        steps = [[-1, -1],[0, 1], [1, 0]] #hole 0 moves from sl 0 to 1
+        steps = [[-1, -1],[0, 1], [1, 0]] # green hole moves from sl 0 to 1
         for n, step in enumerate(steps):
             state = copy.deepcopy(state0)
             lat = self.make_step(state['lat'], step)
             seq = state['seq'] + [step]
             state = {'lat': lat, 'seq': seq}
-            #print(state)
+            k_phase = 0
+            if self.honeycomb and self.big_unit_cell:
+                k_phase = k[0] * np.sqrt(3)
 
-            # search for this state in the basis
             a = self.state_2_list_entry(state)
             found, j = self.basis.search(a)
-            k_phase = k[0] * np.sqrt(3)
-            k_phase = 1/2*(-k[0] * np.sqrt(3) - k[1]*3)
-            #print(f'j={j}')
+            
             if found:
-                v[j] += 1/(np.sqrt(3)) * np.exp(1j * n * (2*np.pi/3 * m3)) * np.exp(-1j * k_phase) # k[0] * np.sqrt(3) added since these states are l=1
-        return v
-
-    def rot_trial_state_new(self,m3,k):
-        v0 = np.zeros((self.basis.length), dtype=complex)
-        v0[1] = 1/np.sqrt(3)
-        R = self.build_rot_matrix(k)
-        m3_phase = np.exp(1j * (2*np.pi/3) * m3)
-        v1 = R.dot(v0)*m3_phase
-        v2 = R.dot(v1)*m3_phase**2
-        v = (v0 + v1 + v2)
-        return v
-    
-    def rot_trial_state(self, m3, k):
-        lat = self.Neel_state[0]
-        seq = []
-        state0 = {'lat': lat, 'seq': seq}
-        v = np.zeros((self.basis.length), dtype=complex)
-        lat = np.zeros((self.L_size, self.L_size), dtype=bool)
-        steps = [[1,0], [0, 1], [-1, -1]] #hole 0 moves from sl 0 to 1
-        for n, step in enumerate(steps):
-            state = copy.deepcopy(state0)
-            lat = self.make_step(state['lat'], step)
-            seq = state['seq'] + [step]
-            state = {'lat': lat, 'seq': seq}
-            #print(state)
-
-            # search for this state in the basis
-            a = self.state_2_list_entry(state)
-            found, j = self.basis.search(a)
-            #print(f'j={j}')
-            if found:
-                v[j] += 1/(np.sqrt(3)) * np.exp(1j * n * (2*np.pi/3 * m3 + k[0] * np.sqrt(3))) # k[0] * np.sqrt(3) added since these states are l=1
+                v[j] += 1/(np.sqrt(3)) * np.exp(1j * n * (2*np.pi/3 * m3)) * np.exp(-1j * k_phase) 
         return v
 # -----------------------------------------------------------------------------------
 
