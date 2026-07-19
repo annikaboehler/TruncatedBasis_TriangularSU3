@@ -86,6 +86,7 @@ class StringBasis:
             self.big_unit_cell = False
         elif isinstance(unit_cell, int):
             self.big_unit_cell = True
+        print(f'1hole (2) big_unit_cell={self.big_unit_cell}, unit_cell={unit_cell}')
 
         self.tol = 0
 
@@ -143,7 +144,9 @@ class StringBasis:
             elif x % 3 == 2:
                 dist1[1] += 1
         elif not self.honeycomb:
-            z = np.sum(np.array(seq), axis=0, dtype=int)
+            seq_test = seq.copy()
+            seq_test.append([0,1]) #changed for red hole
+            z = np.sum(np.array(seq_test), axis=0, dtype=int)
             z = (-np.sum(z)+1)%3
             x,y = dist1[0]%3, dist1[1]%3
             dist1[1] += (z-x-y)%3-z
@@ -606,6 +609,31 @@ class StringBasis:
 
         return np.array(E), np.array(Evs)
     
+    def dispersion_nmax(self,k_array,two_D=False, num_n=1, t=1, t2=0, j=0.3, j_perp=0.3, p=-1, V=0):
+        if two_D:
+            k_x = k_array[0]
+            k_y = k_array[1]
+            # Initialize both containers matching the 2D grid dimensions
+            Es = np.empty(k_x.shape + (num_n,))
+            Evs = np.empty(k_x.shape + (num_n, len(self.bin_basis)), dtype=complex)
+            
+            for i in range(k_x.shape[0]):
+                for l in range(k_x.shape[1]):
+                    self.compute_H([k_x[i,l], k_y[i,l]], t=t, t2=t2, j=j, j_perp=j_perp)
+                    E, V_sys = self.eigensys(num_n - 1, full=True)
+                    Es[i,l,:] = E
+                    Evs[i,l,:,:] = V_sys.T # Shape: (n_states, n_basis), stored to match grid
+            return Es, Evs
+        else:
+            E = [] 
+            Evs = []
+            for i in range(k_array.shape[0]):
+                k = k_array[i,:]
+                self.compute_H(k, t=t, t2=t2, j=j, j_perp=j_perp, p=p, V=V)
+                sys_E, sys_V = self.eigensys(num_n - 1, full=True)
+                E.append(sys_E)
+                Evs.append(sys_V)
+            return np.array(E), np.array(Evs)
         
     def rot_state_120(self, state):         #not tested, possible without for loop?
         lat = state['lat']
