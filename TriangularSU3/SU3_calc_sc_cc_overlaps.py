@@ -154,12 +154,16 @@ Ms0 = np.zeros((L,L), dtype=complex)
 Ms1 = np.zeros((L,L), dtype=complex)
 overlap_counter = 0
 
-total_iterations = 2*len(lat_sc1.indices1)-1 #since either n1 or n2 have to be zero
+if honeycomb:
+    total_iterations = 2*len(lat_sc1.indices1)-1 #since either n1 or n2 have to be zero
+else:
+    total_iterations = len(lat_sc1.indices1)*len(lat_sc1.indices1) #evaluate all combinations
 with tqdm(total=total_iterations) as pbar:
     for n1 in lat_sc1.indices1:  #if we let hole 2 hop as well we need to have symmetrie in strings 
         for n2 in lat_sc2.indices2: 
-            if len(lat_sc1.bin_basis[n1]['seq']) != 0 and len(lat_sc2.bin_basis[n2]['seq']) != 0:
-                continue
+            if honeycomb:
+                if len(lat_sc1.bin_basis[n1]['seq']) != 0 and len(lat_sc2.bin_basis[n2]['seq']) != 0:
+                    continue
 
             j_max = min(lat_sc1.depth+3,lat_cc.depth+2)
             j_min = -j_max
