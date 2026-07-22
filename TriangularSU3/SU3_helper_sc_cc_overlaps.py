@@ -99,7 +99,7 @@ def find_l0_state_sc2(lat: Lat_sc2, n_max=7): #used; #lower n_max for testing
             n += 1
     return n
 
-def init_lattices(l_max_sc, l_max_cc, l_max_sc_overlaps, j_perp_div_j=1., connected=True, honeycomb=False):
+def init_lattices(l_max_sc, l_max_cc, l_max_sc_overlaps, j_perp_div_j=1., connected=True, honeycomb=False, unit_cell=0):
     """
     initialize and construct truncated basis for sc and cc.
     save indices of sc_basis, where string is smaller (or equal) than l_max_sc_overlaps
@@ -115,8 +115,8 @@ def init_lattices(l_max_sc, l_max_cc, l_max_sc_overlaps, j_perp_div_j=1., connec
     lat_sc: Lat_sc: lattice class from truncted basis for the sc
     lat_cc: Lat_cc: lattice class from truncted basis for the cc
     """
-    lat_sc1 = Lat_sc1(l_max_sc, only_connected=connected, honeycomb=honeycomb)
-    lat_sc2 = Lat_sc2(l_max_sc, only_connected=connected, honeycomb=honeycomb)
+    lat_sc1 = Lat_sc1(l_max_sc, only_connected=connected, honeycomb=honeycomb,unit_cell=unit_cell)
+    lat_sc2 = Lat_sc2(l_max_sc, only_connected=connected, honeycomb=honeycomb,unit_cell=unit_cell)
     #lat_sc.generate_basis()
     #lat_sc.matrix_el(1., 1., j_perp_div_j, 1.) #t=1, j_z=1, t2=1, j_perp=j_perp_div_j, why?
     lat_sc1.matrix_el() 

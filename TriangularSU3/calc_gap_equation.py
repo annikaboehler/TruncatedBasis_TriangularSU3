@@ -25,7 +25,7 @@ from SU3_helper_sc_cc_overlaps  import *
 
 honeycomb = True
 system = 'SU2Hc' if honeycomb else 'SU3Tri'
-L=101
+L=51
 Ly = L
 Lx = L
 j = 0.3
@@ -38,9 +38,11 @@ depth_sc = 4
 depth_cc = 4
 l_max_sc_overlaps = 4
 k_cc = np.array([0,0])
+unit_cell = 1
 
+# gap parameters
 beta = 2000
-c_p = 0.05
+c_p = 0.05 #percentage of the sc bandwidth to set the chemical potential, should be between 0 and 1
 delta_E = -0.1 #should be negative and not smaller then the sc bandwidth 
 
 # make k_grid
@@ -48,7 +50,7 @@ k_grid = make_triangular_grid_bz(L)
 
 k_path = k_grid.T
 t0 = perf_counter()
-lat_sc1 = StringBasis(depth_sc, connected, honeycomb, big_unit_cell=True)
+lat_sc1 = StringBasis(depth_sc, connected, honeycomb, unit_cell=unit_cell)
 lat_sc1.matrix_el()
 sc_disp = np.zeros([1,len(k_path)])
 sc_disp, _ = lat_sc1.dispersion(k_path, two_D=False, state=1, t=t, t2=t2, j=j, j_perp=j_perp)
@@ -185,8 +187,10 @@ hole_1_hop = True
 hole_2_hop = True
 Ms0 = np.zeros(k_shape)
 Ms1 = np.zeros(k_shape)
-
-total_iterations = 2*len(lat_sc1.indices1)-1 #since either n1 or n2 have to be zero
+if honeycomb:
+    total_iterations = 2*len(lat_sc1.indices1)-1 #since either n1 or n2 have to be zero
+else:
+    total_iterations = len(lat_sc1.indices1)*len(lat_sc1.indices1) #evaluate all combinations
 with tqdm(total=total_iterations) as pbar:
     for n1 in lat_sc1.indices1:  #if we let hole 2 hop as well we need to have symmetrie in strings 
         for n2 in lat_sc2.indices2: 
@@ -573,5 +577,3 @@ plt.tight_layout()
 
 # 4. Save and Show
 plt.savefig(f'../results/figures/Deltak_{system}_Grid.pdf')
-plt.show()
-

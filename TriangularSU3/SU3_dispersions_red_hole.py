@@ -1,14 +1,15 @@
+
 import numpy as np
 from scipy.sparse.linalg import eigsh
 from scipy.linalg import eigh
 from scipy.sparse import csr_matrix
 
 from importlib import reload
-import SU3_1hole_triangular
+import SU3_1hole_triangular2
 import SU3_2hole_triangular
-reload(SU3_1hole_triangular)
+reload(SU3_1hole_triangular2)
 reload(SU3_2hole_triangular)
-from SU3_1hole_triangular import StringBasis as basis_tri_1h
+from SU3_1hole_triangular2 import StringBasis as basis_tri_1h2
 from SU3_2hole_triangular import StringBasis as basis_tri_2h
 
 
@@ -21,10 +22,10 @@ t = 1
 J = 0.3
 unit_cell = 1
 honeycomb = False
-system = 'SU2Hc' if honeycomb else 'SU3Tri'
+system = 'SU2Hc2' if honeycomb else 'SU3Tri2'
 #define Krylov basis
 print("params: l_sc=", l_sc, "l_cc=", l_cc, "t=", t, "J=", J, "honeycomb=", honeycomb, "unit_cell=", unit_cell)
-basis_1 = basis_tri_1h(depth=l_sc, only_connected=False, honeycomb=honeycomb, unit_cell=unit_cell)
+basis_1 = basis_tri_1h2(depth=l_sc, only_connected=False, honeycomb=honeycomb, unit_cell=unit_cell)
 basis_2 = basis_tri_2h(depth=l_cc, only_connected=False, honeycomb=honeycomb, unit_cell=unit_cell)
 
 
@@ -105,78 +106,75 @@ for i, k in enumerate(k_path):
 ops = ops/np.max(ops)
 np.save(f"../results/TRI/{system}_rot_overlaps_cc_depth={l_cc}_t={t}_j={J}_uc={unit_cell}.npy", ops)
 
-
-# print("----------- calculating 2D rotational overlaps -----------------")
-
-# k_flat = karray.reshape(2, -1).T 
-
-# disp_cut, evs = basis_1.dispersion_nmax(karray, two_D=True, j=J, t=t)
-
-# # Reshape evs to easily access state vectors sequentially: (N_grid_points, N_bands, N_basis)
-# evs_flat = evs.reshape(-1, evs.shape[-2], evs.shape[-1])
-# ops = np.empty((evs_flat.shape[0], evs_flat.shape[1], 3), dtype=complex)
-
-# for i, k in enumerate(k_flat):
-#     trial_state0 = basis_1.rot_trial_state(m3=0, k=k)
-#     trial_state1 = basis_1.rot_trial_state(m3=1, k=k)
-#     trial_state2 = basis_1.rot_trial_state(m3=2, k=k)
-    
-#     for j, state in enumerate(evs_flat[i].T):
-#         ops[i, j, 0] = np.abs(np.dot(state, trial_state0.conj()))**2
-#         ops[i, j, 1] = np.abs(np.dot(state, trial_state1.conj()))**2
-#         ops[i, j, 2] = np.abs(np.dot(state, trial_state2.conj()))**2
-
-# ops = ops / np.max(ops)
-# # Reshape ops back to match the original grid dimensions before saving
-# ops_grid = ops.reshape(karray.shape[1], karray.shape[2], -1, 3)
-# np.save(f"../results/TRI/{system}/2D_rot_overlaps_sc_depth={l_sc}_t={t}_j={J}_uc={unit_cell}.npy", ops_grid)
-
-# print("----------- calculating 2D rotational overlaps -----------------")
-# disp_cut, evs = basis_1.dispersion_nmax(karray, two_D=True, j=J, t=t)
-
-# # Flatten the meshgrid coordinates into a clean list of 2D vectors
-# k_flat = karray.reshape(2, -1).T 
-
-# # Flatten the grid dimensions of evs: (grid_x, grid_y, bands, basis_size) -> (grid_points, bands, basis_size)
-# evs_flat = evs.reshape(-1, evs.shape[-2], evs.shape[-1])
-# ops = np.empty((evs_flat.shape[0], evs_flat.shape[1], 3), dtype=complex)
-
-# for i, k in enumerate(k_flat):
-#     trial_state0 = basis_1.rot_trial_state(m3=0, k=k)
-#     trial_state1 = basis_1.rot_trial_state(m3=1, k=k)
-#     trial_state2 = basis_1.rot_trial_state(m3=2, k=k)
-    
-#     # evs_flat[i] has shape (bands, basis_size)
-#     # Looping over it directly yields each band's state vector with shape (basis_size,)
-#     for j, state in enumerate(evs_flat[i]):
-#         ops[i, j, 0] = np.abs(np.dot(state, trial_state0.conj()))**2
-#         ops[i, j, 1] = np.abs(np.dot(state, trial_state1.conj()))**2
-#         ops[i, j, 2] = np.abs(np.dot(state, trial_state2.conj()))**2
-
-# ops = ops / np.max(ops)
-# # Reshape back to the original 2D grid shape (grid_x, grid_y, bands, 3)
-# ops_grid = ops.reshape(karray.shape[1], karray.shape[2], -1, 3)
-# np.save(f"../results/TRI/{system}2D_rot_overlaps_sc_depth={l_sc}_t={t}_j={J}_uc={unit_cell}.npy", ops_grid)
-# print('Saved 2D rotational overlaps for single hole system.')
-
-# disp_cut, evs = basis_2.dispersion_nmax(karray, two_D=True, j=J, t=t)
-
-# evs_flat = evs.reshape(-1, evs.shape[-2], evs.shape[-1])
-# ops = np.empty((evs_flat.shape[0], evs_flat.shape[1], 3), dtype=complex)
-
-# for i, k in enumerate(k_flat):
-#     trial_state0 = basis_2.rot_trial_state(m3=0, k=k)
-#     trial_state1 = basis_2.rot_trial_state(m3=1, k=k)
-#     trial_state2 = basis_2.rot_trial_state(m3=2, k=k)
-    
-#     for j, state in enumerate(evs_flat[i]):
-#         ops[i, j, 0] = np.abs(np.dot(state, trial_state0.conj()))**2
-#         ops[i, j, 1] = np.abs(np.dot(state, trial_state1.conj()))**2
-#         ops[i, j, 2] = np.abs(np.dot(state, trial_state2.conj()))**2
-
-# ops = ops / np.max(ops)
-# # Reshape ops back to match the original grid dimensions before saving
-# ops_grid = ops.reshape(karray.shape[1], karray.shape[2], -1, 3)
-# np.save(f"../results/TRI/{system}2D_rot_overlaps_cc_depth={l_cc}_t={t}_j={J}_uc={unit_cell}.npy", ops_grid)
-
 print("----------- finished calculations -----------------")
+
+
+import numpy as np
+import matplotlib.pyplot as plt
+import sys
+
+#set system parameters
+l_sc = 4
+l_cc = 4
+
+t = 1
+j = 0.3
+
+honeycomb = False
+unit_cell = 1
+
+Code = 'TRI'
+
+#K space values
+K = 4*np.pi/(3*np.sqrt(3))*np.array([1, 0])
+Kp = 2*np.pi/(3*np.sqrt(3))*np.array([1, np.sqrt(3)])
+M = np.pi/3*np.array([np.sqrt(3), 1])
+Gamma = np.array([0,0])
+points_1D=180
+# Paths between symmetry point   
+path1 = np.linspace(Gamma, K, int(points_1D/3), endpoint=False)
+path2 = np.linspace(K, M, int(points_1D/6), endpoint=False)
+path3 = np.linspace(M, Kp, int(points_1D/6), endpoint=False)
+path4 = np.linspace(Kp, Gamma, int(points_1D/3)+1)
+k_path = np.vstack((path1, path2, path3, path4))
+x1 = np.linspace(0,points_1D,k_path.shape[0])
+xticks = [0, 60, 90, 120, 180]
+xlabels = ['$\\Gamma$', 'K', 'M', "K'", '$\\Gamma$']
+
+#load overlaps
+path_data = "../"
+ops_sc = np.load(f"{path_data}results/{Code}/{system}_rot_overlaps_sc_depth={l_sc}_t={t}_j={j}_uc={unit_cell}.npy")
+ops_cc = np.load(f"{path_data}results/{Code}/{system}_rot_overlaps_cc_depth={l_cc}_t={t}_j={j}_uc={unit_cell}.npy")
+
+disp_sc = np.load(f"{path_data}results/{Code}/{system}_1D_dispersion_sc_path_GKMKpG_depth={l_sc}_t={t}_j={j}_uc={unit_cell}.npy")
+disp_cc = np.load(f"{path_data}results/{Code}/{system}_1D_dispersion_cc_path_GKMKpG_depth={l_cc}_t={t}_j={j}_uc={unit_cell}.npy")
+x1 = np.repeat(x1, disp_sc.shape[0])
+print(disp_sc.shape)
+print(disp_sc.shape[0])
+fig, axs = plt.subplots(1,3, figsize=(15,5))
+for i in range(3):
+    axs[i].scatter(x1, disp_sc.T, marker='o', alpha=np.real(ops_sc[:,:,i]))
+    axs[i].set_title('$m_3=$'+str(i), size=20)
+    axs[i].grid()
+    axs[i].set_xticks(xticks, xlabels, size=20)
+    axs[i].tick_params(axis='y', labelsize=20)  # Increase the size of the numbers on the y-axis
+axs[0].set_ylabel('$E_0/t$', size=20)
+# plt.suptitle(fr'sc rotational overlap for unit cell: {unit_cell}',size=18)
+plt.tight_layout()
+plt.savefig(f'{path_data}results/figures/{Code}_{system}_rot_overlaps_sc_depth={l_sc}_t={t}_j={j}_uc={unit_cell}.pdf', bbox_inches='tight')
+
+
+print(f'disp_cc.shape: {disp_cc.shape}, ops_cc.shape: {ops_cc.shape}')
+print(f' x1 shape: {x1.shape}')
+fig, axs = plt.subplots(1,3, figsize=(15,5))
+for i in range(3):
+    axs[i].scatter(x1, disp_cc.T, marker='o', alpha=np.real(ops_cc[:,:,i]))
+    axs[i].set_title('$m_3=$'+str(i), size=20)
+    axs[i].grid()
+    axs[i].set_xticks(xticks, xlabels, size=20)
+    axs[i].tick_params(axis='y', labelsize=20)
+axs[0].set_ylabel('$E_0/t$', size=20)
+# plt.suptitle(fr'cc rotational overlap for unit cell: {unit_cell}',size=18)
+plt.tight_layout()
+plt.savefig(f'{path_data}results/figures/{Code}_{system}_rot_overlaps_cc_depth={l_cc}_t={t}_j={j}_uc={unit_cell}.pdf', bbox_inches='tight')
+print("----------- finished plotting -----------------")

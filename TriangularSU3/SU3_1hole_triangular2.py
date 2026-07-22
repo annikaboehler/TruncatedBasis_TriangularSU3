@@ -1,4 +1,4 @@
-# SU(3) triangular Linus 
+# SU(3) triangular Linus red hole
 import numpy as np
 import copy
 from scipy.sparse.linalg import eigsh
@@ -68,7 +68,7 @@ class sorted_list:
 
 class StringBasis:
 # A class for generating a truncated basis
-    def __init__(self, depth, only_connected=True, honeycomb=False, unit_cell=True):  # works only for depth<=14 otherwise change uint32 to uint64!
+    def __init__(self, depth, only_connected=True, honeycomb=False, unit_cell=0):  # works only for depth<=14 otherwise change uint32 to uint64!
         self.depth = depth
         self.L_size = 2*self.depth+3 
         self.Neel_state = []
@@ -625,14 +625,13 @@ class StringBasis:
                     Evs[i,l,:,:] = V_sys.T # Shape: (n_states, n_basis), stored to match grid
             return Es, Evs
         else:
-            E = [] 
-            Evs = []
+            E=[] 
+            Evs= []
             for i in range(k_array.shape[0]):
-                k = k_array[i,:]
-                self.compute_H(k, t=t, t2=t2, j=j, j_perp=j_perp, p=p, V=V)
-                sys_E, sys_V = self.eigensys(num_n - 1, full=True)
-                E.append(sys_E)
-                Evs.append(sys_V)
+                k=k_array[i,:]
+                self.compute_H(k, t=t, t2=t2, j=j, j_perp=j_perp)
+                E.append(self.eigensys(num_n -1, full=True)[0])
+                Evs.append(self.eigensys(num_n -1, full=True)[1])
             return np.array(E), np.array(Evs)
         
     def rot_state_120(self, state):         #not tested, possible without for loop?

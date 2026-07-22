@@ -606,6 +606,30 @@ class StringBasis:
 
         return np.array(E), np.array(Evs)
     
+    def dispersion_nmax(self,k_array,two_D=False, num_n=1, t=1, t2=0, j=0.3, j_perp=0.3, p=-1, V=0):
+        if two_D:
+            k_x = k_array[0]
+            k_y = k_array[1]
+            # Initialize both containers matching the 2D grid dimensions
+            Es = np.empty(k_x.shape + (num_n,))
+            Evs = np.empty(k_x.shape + (num_n, len(self.bin_basis)), dtype=complex)
+            
+            for i in range(k_x.shape[0]):
+                for l in range(k_x.shape[1]):
+                    self.compute_H([k_x[i,l], k_y[i,l]], t=t, t2=t2, j=j, j_perp=j_perp)
+                    E, V_sys = self.eigensys(num_n - 1, full=True)
+                    Es[i,l,:] = E
+                    Evs[i,l,:,:] = V_sys.T # Shape: (n_states, n_basis), stored to match grid
+            return Es, Evs
+        else:
+            E=[] 
+            Evs= []
+            for i in range(k_array.shape[0]):
+                k=k_array[i,:]
+                self.compute_H(k, t=t, t2=t2, j=j, j_perp=j_perp)
+                E.append(self.eigensys(num_n -1, full=True)[0])
+                Evs.append(self.eigensys(num_n -1, full=True)[1])
+            return np.array(E), np.array(Evs)
         
     def rot_state_120(self, state):         #not tested, possible without for loop?
         lat = state['lat']
