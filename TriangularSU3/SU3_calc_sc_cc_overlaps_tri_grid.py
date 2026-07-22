@@ -172,6 +172,10 @@ Ms0 = np.zeros((L,L), dtype=complex)
 Ms1 = np.zeros((L,L), dtype=complex)
 overlap_counter = 0
 
+Ms0 = np.zeros(k_shape)
+Ms1 = np.zeros(k_shape)
+
+overlap_count = 0
 if honeycomb:
     total_iterations = 2*len(lat_sc1.indices1)-1 #since either n1 or n2 have to be zero
 else:
@@ -179,14 +183,25 @@ else:
 with tqdm(total=total_iterations) as pbar:
     for n1 in lat_sc1.indices1:  #if we let hole 2 hop as well we need to have symmetrie in strings 
         for n2 in lat_sc2.indices2: 
+
             if honeycomb:
                 if len(lat_sc1.bin_basis[n1]['seq']) != 0 and len(lat_sc2.bin_basis[n2]['seq']) != 0:
                     continue
 
             j_max = min(lat_sc1.depth+3,lat_cc.depth+2)
             j_min = -j_max
+            # j_min = (np.ones(2,)*(-lat_cc.depth-2)).astype(int) #improve these bounds in the future
+            # j_max = (np.ones(2,)*(lat_cc.depth+2)).astype(int)
+
             x = lat_sc1.find_hole_sublattice(lat_sc1.bin_basis[n1]['seq'])
             y = lat_sc2.find_hole_sublattice(lat_sc2.bin_basis[n2]['seq'])
+
+            # if not x==2 and not y==2:   #selects only couplings that are exclusive to triangular lattice
+            #     continue
+
+            # if x==2 or y==2:   #selects only couplings that are exclusive to honeycomb lattice
+            #     continue
+
             seq1 = lat_sc1.bin_basis[n1]['seq']
             seq_hole_1 = []
             if len(seq1) != 0:
@@ -198,7 +213,8 @@ with tqdm(total=total_iterations) as pbar:
 
             for jx in range(j_min, j_max+1):
                 for jy in range(j_min, j_max+1):
-            
+            # for jx in [2]:
+            #     for jy in [0]:
                     offset = np.array([jx, jy])
                     lat1 = lat_sc1.bin_basis[n1]['lat'].copy()
                     subl1 = lat_sc1.find_sublattice(lat_sc1.bin_basis[n1])
@@ -237,6 +253,7 @@ with tqdm(total=total_iterations) as pbar:
                     # apply S ^(+)_i S^(+)_j on l.h.s. of expectation value, i.e.
                     # <cc|SS
                     state, state_uncropped = add_holes(n1, n2, jx, jy, lat_sc1, lat_sc2, lat_cc, too_large=too_large)
+                    # print(state, state_uncropped)
                     if type(state)==dict and not too_large:
                         found, _ = lat_cc.basis.search(lat_cc.state_2_list_entry(state))    #discard states that are in the cc basis, since they should be either sc+sc or cc not both
                         if found:
@@ -245,8 +262,7 @@ with tqdm(total=total_iterations) as pbar:
                         ### Hole 1 hops
                         for delta in [np.array([1,2]), np.array([2,1]), np.array([1,-1]), np.array([-1,-2]), np.array([-2,-1]), np.array([-1,1])]: 
                             if hole_1_hop == False:
-                                continue              
-                            # avoid hopping into strings
+                                continue
                             shift2 = np.ones((2,), dtype=int)*(offset-lat_sc1.depth-1)     #shift is combination of offset & lat_sc depth 
                             if np.any(np.all(sitelist2 == delta - shift2, axis=1)):  #hole1 hopping
                                 continue
@@ -279,20 +295,23 @@ with tqdm(total=total_iterations) as pbar:
                             # print(f'test_state: {test_state}, too_large: {too_large}')
                             found, m = lat_cc.basis.search(lat_cc.state_2_list_entry(test_state)) 
                             if found:
+                                overlap_count =+1
                                 repr, _, m = lat_cc.is_representative[m]
                                 phys_dist = np.array(lat_cc.dist_2_phys_dist([jx, jy], seq_hole_1))
                                 phys_delta = np.zeros(2)
                                 phys_delta[0], phys_delta[1] = np.sqrt(3)/2*delta[0], delta[1] - 1/2*delta[0]
-                                dM0 = 1/np.sqrt(2) * np.conj(v_cc_0[m]) * vs_sc_1[:,:,n1] * vs_sc_2[:,:,n2] * np.exp(1j * np.einsum('axy,a->xy', k2, phys_dist - phys_delta) - 1j * np.einsum('axy,a->xy', k1, phys_delta))
-                                dM1 = 1/np.sqrt(2) * np.conj(v_cc_1[m]) * vs_sc_1[:,:,n1] * vs_sc_2[:,:,n2] * np.exp(1j * np.einsum('axy,a->xy', k2, phys_dist - phys_delta) - 1j * np.einsum('axy,a->xy', k1, phys_delta))
+                                # print(f"k2 shape: {k2.shape}")
+                                # print(f"phys_dist shape: {phys_dist.shape}")
+                                # print(k1.shape, k2.shape, phys_dist.shape, phys_delta.shape)
+                                dM0 = 1/np.sqrt(2) * np.conj(v_cc_0[m]) * vs_sc_1[:,n1] * vs_sc_2[:,n2] * np.exp(1j * np.einsum('ax,a->x', k2, phys_dist - phys_delta) - 1j * np.einsum('ax,a->x', k1, phys_delta))
+                                dM1 = 1/np.sqrt(2) * np.conj(v_cc_1[m]) * vs_sc_1[:,n1] * vs_sc_2[:,n2] * np.exp(1j * np.einsum('ax,a->x', k2, phys_dist - phys_delta) - 1j * np.einsum('ax,a->x', k1, phys_delta))
                                 # factor 1/sqrt(2) comes from projection onto ferminoic states
                                 if not repr:
-                                    dM0 *= -1 * np.exp(-1j * np.einsum('axy,a->xy', k1 + k2, phys_dist - phys_delta))
-                                    dM1 *= -1 * np.exp(-1j * np.einsum('axy,a->xy', k1 + k2, phys_dist - phys_delta))
+                                    dM0 *= -1 * np.exp(-1j * np.einsum('ax,a->x', k1 + k2, phys_dist - phys_delta))
+                                    dM1 *= -1 * np.exp(-1j * np.einsum('ax,a->x', k1 + k2, phys_dist - phys_delta))
                                 Ms0 = Ms0 + dM0
                                 Ms1 = Ms1 + dM1
 
-                                overlap_counter +=1
                         ### Hole 2 hops
                         for delta in [np.array([1,2]), np.array([2,1]), np.array([1,-1]), np.array([-1,-2]), np.array([-2,-1]), np.array([-1,1])]: 
                             if hole_2_hop == False:
@@ -327,22 +346,24 @@ with tqdm(total=total_iterations) as pbar:
                             test_state = {'lat': test_lat_new, 'hole_pos': test_hole_pos_new, 'seq': test_seq_new}
                             found, m = lat_cc.basis.search(lat_cc.state_2_list_entry(test_state)) 
                             if found:
+                                overlap_count =+1
+                                
                                 repr, _, m = lat_cc.is_representative[m]
                                 phys_dist = np.array(lat_cc.dist_2_phys_dist([jx, jy], seq_hole_1))
                                 phys_delta = np.zeros(2)
                                 phys_delta[0], phys_delta[1] = np.sqrt(3)/2*delta[0], delta[1] - 1/2*delta[0]
-                                dM0 = 1/np.sqrt(2) * np.conj(v_cc_0[m]) * vs_sc_1[:,:,n1] * vs_sc_2[:,:,n2] * np.exp(1j * np.einsum('axy,a->xy', k2, phys_dist))
-                                dM1 = 1/np.sqrt(2) * np.conj(v_cc_1[m]) * vs_sc_1[:,:,n1] * vs_sc_2[:,:,n2] * np.exp(1j * np.einsum('axy,a->xy', k2, phys_dist))
+                                dM0 = 1/np.sqrt(2) * np.conj(v_cc_0[m]) * vs_sc_1[:,n1] * vs_sc_2[:,n2] * np.exp(1j * np.einsum('ax,a->x', k2, phys_dist))
+                                dM1 = 1/np.sqrt(2) * np.conj(v_cc_1[m]) * vs_sc_1[:,n1] * vs_sc_2[:,n2] * np.exp(1j * np.einsum('ax,a->x', k2, phys_dist))
                                 # factor 1/sqrt(2) comes from projection onto ferminoic states
                                 if not repr:
-                                    dM0 *= -1 * np.exp(-1j * np.einsum('axy,a->xy', k1 + k2, phys_dist + phys_delta))
-                                    dM1 *= -1 * np.exp(-1j * np.einsum('axy,a->xy', k1 + k2, phys_dist + phys_delta))
+                                    dM0 *= -1 * np.exp(-1j * np.einsum('ax,a->x', k1 + k2, phys_dist + phys_delta))
+                                    dM1 *= -1 * np.exp(-1j * np.einsum('ax,a->x', k1 + k2, phys_dist + phys_delta))
                                 Ms0 = Ms0 + dM0
                                 Ms1 = Ms1 + dM1
-                                overlap_counter +=1
+                                # print(f'offset: {offset}')
             pbar.update(1)
 Ms_t2_0 = Ms0
-Ms_t2_1 = Ms1
+Ms_t2_1 = Ms1 
 np.save("../results/TRI/sc_cc_overlaps/M_t_"+str(system)+"_depth_sc="+str(depth_sc)+"_depth_cc="+str(depth_cc)+"_lmax_sc_overlaps="+str(l_max_sc_overlaps)+"_jperp="+str(j_perp)+"_j="+str(j)+"_t="+str(t)+".npy", (Ms_t2_0, Ms_t2_1))
 print("total overlaps t_prime:", overlap_counter)
 
