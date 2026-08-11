@@ -665,105 +665,41 @@ class StringBasis:
                                 # # phase = -1*self.dist_2_phys_dist(hole_pos1[1] - self.depth - 1, seq)
                                 # # print(f'Phase*K1={(phase[0]*K1[0] + phase[1]*K1[1])/np.pi}')
                                 # print()
-        # print('len data_t matrix_el: ', len(self.data_t))
-        # print('len row_t matrix_el: ', len(self.row_t))
-        # print('len col_t matrix_el: ', len(self.col_t))
+        
 
-            # steps = [np.array([1, 1, 0]), np.array([1, 0, 1]), np.array([1, -1, -1])]
-            # la = hole_pos[1] - self.depth - 1
-            # la = self.dist_2_phys_dist(la, seq)
-            # # print(f'state {i} hole sublattices: {self.find_hole_sublattice(seq)}')
-            # if self.find_hole_sublattice(seq)[1]==0:
-            #     for step in steps:
-            #         y1 = hole_pos[1]+step[1:]
-            #         y2 = hole_pos[1]-step[1:]
-            #         if np.all((y1 >= 0) & (y1 < self.L_size)) and np.all((y2 >= 0) & (y2 < self.L_size)):  
-            #             lat1 = lat.copy()
-            #             hole_pos1 = hole_pos.copy()
-            #             lat1, hole_pos1 = self.make_step(lat1, hole_pos1, step)
-            #             state1 = {'lat': lat1, 'hole_pos': hole_pos1, 'seq': seq + [step]}
-            #             # now state = H_{t}|i>
-            #             a = self.state_2_list_entry(state1)
-            #             found, m = self.basis.search(a)
-            #             if found:
-            #                 (rep, _, j) = self.is_representative[m]
-            #                 self.row_t.append(j)
-            #                 self.col_t.append(i)
-            #                 # print(f'TRI rep {i} couples to {j} via step: {step} without swapping')
-            #                 if rep:
-            #                     self.data_t.append((0, np.zeros((2,), dtype=int))) #no holes exchanged, no displacement
-            #                     # print(f'TRI rep {i} couples to {j} via step: {step} with: ')
-            #                 else:
-            #                     self.data_t.append((1, -1*la)) #holes exchanged
-            #                     # print(f'TRI rep {i} couples to {j} via step: {step} with: swap2 ')
-                                
-            # state1 = copy.deepcopy(state)       #is normal copy enough here?  
-            # state_ex = self.exchange_holes(state1)  
-            # lat_ex = state_ex['lat']
-            # hole_pos_ex = state_ex['hole_pos']
-            # seq_ex = state_ex['seq']
-            # if self.find_hole_sublattice(seq_ex)[1]==0:
-            #     for step in steps:
-            #         y1 = hole_pos[1]+step[1:]
-            #         y2 = hole_pos[1]-step[1:]
-            #         if np.all((y1 >= 0) & (y1 < self.L_size)) and np.all((y2 >= 0) & (y2 < self.L_size)):  
-            #             lat1 = lat_ex.copy()
-            #             hole_pos1 = hole_pos_ex.copy()
-            #             lat1, hole_pos1 = self.make_step(lat1, hole_pos1, step)
-            #             state1 = {'lat': lat1, 'hole_pos': hole_pos1, 'seq': seq_ex + [step]}
-            #             # now state = H_{t}|i>
-            #             a = self.state_2_list_entry(state1)
-            #             found, m = self.basis.search(a)
-            #             if found:
-            #                 (rep, _, j) = self.is_representative[m]
-            #                 self.row_t.append(j)
-            #                 self.col_t.append(i)
-            #                 # print(f'TRI rep {i} couples to {j} via step: {step} with swapping')
-            #                 if rep:
-            #                     self.data_t.append((1, -1*la))
-            #                     # print(f'TRI rep {i} couples to {j} via step: {step} with: swap1 ')
-            #                 else:
-            #                     la2 = hole_pos1[1] - self.depth - 1
-            #                     la2 = self.dist_2_phys_dist(la2, seq_ex)
-            #                     self.data_t.append((0, -1*(la+la2)))
-            #                     # print(f'TRI rep {i} couples to {j} via step: {step} with: swap1, swap2 ')
-
-
-        # print('len data_t matrix_el: ', len(self.data_t)) 
-
-            ##### compute H_{t'}(k) part:   next nearest neighbour hopping
-            # for step in steps2:
-            #     y1 = hole_pos[1]+step[1:]
-            #     y2 = hole_pos[1]-step[1:]
-            #     if np.all((y1 >= 0) & (y1 < self.L_size)) and np.all((y2 >= 0) & (y2 < self.L_size)):   
-            #         lat1 = lat.copy()
-            #         hole_pos1 = hole_pos.copy()                     
-            #         lat1, hole_pos1 = self.make_step(lat1, hole_pos1, step)
-            #         y = hole_pos1[1]
-            #         state1 = {'lat': lat1, 'hole_pos': hole_pos1, 'seq': seq + [step]}
-            #         y = hole_pos1[1]
-            #             # now state = H_{t}|i>
-            #         a = self.state_2_list_entry(state1)
-            #         found, m = self.basis.search(a)
-            #         if found:
-            #             # print('found t2 coupling')
-            #             # print(f'seq1: {seq}, step:{step}, seq2:{self.bin_basis[m]['seq']}')
-            #             # print()
-            #             (rep, _, j) = self.is_representative[m]
-            #             self.row_t2.append(j)
-            #             self.col_t2.append(i)
-            #             if step[0] == 0:
-            #                 if rep:
-            #                     self.data_t2.append((0, -1*self.dist_2_phys_dist(step[1:],seq))) #no holes exchanged, no displacement, but still hopping of first hole 
-            #                     #print(f'i = {i}, seq_i={seq}, j = {j}, seq_j={self.representatives[j]['seq']}, step = {step}, rep')
-            #                 else:
-            #                     self.data_t2.append((1, -1*self.dist_2_phys_dist(hole_pos1[1] - self.depth - 1 + step[1:],seq))) #distance in physical lattice
-            #             else:
-            #                 if rep:
-            #                     self.data_t2.append((0, np.zeros((2,), dtype=int))) #no holes exchanged, no displacement
-            #                     #print(f'i = {i}, seq_i={seq}, j = {j}, seq_j={self.representatives[j]['seq']}, step = {step}, rep')
-            #                 else:
-            #                     self.data_t2.append((1, -1*self.dist_2_phys_dist(hole_pos1[1] - self.depth - 1,seq))) #distance in physical lattice  
+            #### compute H_{t'}(k) part:   next nearest neighbour hopping
+            for step in steps2:
+                y1 = hole_pos[1]+step[1:]
+                y2 = hole_pos[1]-step[1:]
+                if np.all((y1 >= 0) & (y1 < self.L_size)) and np.all((y2 >= 0) & (y2 < self.L_size)):   
+                    lat1 = lat.copy()
+                    hole_pos1 = hole_pos.copy()                     
+                    lat1, hole_pos1 = self.make_step(lat1, hole_pos1, step)
+                    y = hole_pos1[1]
+                    state1 = {'lat': lat1, 'hole_pos': hole_pos1, 'seq': seq + [step]}
+                    y = hole_pos1[1]
+                        # now state = H_{t}|i>
+                    a = self.state_2_list_entry(state1)
+                    found, m = self.basis.search(a)
+                    if found:
+                        # print('found t2 coupling')
+                        # print(f'seq1: {seq}, step:{step}, seq2:{self.bin_basis[m]['seq']}')
+                        # print()
+                        (rep, _, j) = self.is_representative[m]
+                        self.row_t2.append(j)
+                        self.col_t2.append(i)
+                        if step[0] == 0:
+                            if rep:
+                                self.data_t2.append((0, -1*self.dist_2_phys_dist(step[1:],seq))) #no holes exchanged, no displacement, but still hopping of first hole 
+                                #print(f'i = {i}, seq_i={seq}, j = {j}, seq_j={self.representatives[j]['seq']}, step = {step}, rep')
+                            else:
+                                self.data_t2.append((1, -1*self.dist_2_phys_dist(hole_pos1[1] - self.depth - 1 + step[1:],seq))) #distance in physical lattice
+                        else:
+                            if rep:
+                                self.data_t2.append((0, np.zeros((2,), dtype=int))) #no holes exchanged, no displacement
+                                #print(f'i = {i}, seq_i={seq}, j = {j}, seq_j={self.representatives[j]['seq']}, step = {step}, rep')
+                            else:
+                                self.data_t2.append((1, -1*self.dist_2_phys_dist(hole_pos1[1] - self.depth - 1,seq))) #distance in physical lattice  
          
     def compute_H(self, k, t=1, j=0.3, j_perp=0.3, t2=0, p=-1, V=0):
     # uses list of data points from matrix_el_j and momentum to create sparse matrix H
