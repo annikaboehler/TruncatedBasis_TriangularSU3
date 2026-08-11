@@ -451,18 +451,18 @@ class StringBasis:
                 
 
             ##### compute H_{t2}(k) part: 
-            # for step in steps2:
-            #     lat1 = lat.copy()
-            #     if np.all(np.abs(np.sum(seq+[step],axis=0))<self.depth+1):
-            #         lat1 = self.make_step(lat1, step)
-            #         state1 = {'lat': lat1, 'seq': seq + [step]}
-            #         # now state = H_{t'}|i>
-            #         a = self.state_2_list_entry(state1)
-            #         found, j = self.basis.search(a)
-            #         if found:
-            #             self.row_t2.append(j)
-            #             self.col_t2.append(i)
-            #             self.data_t2.append((-1*self.dist_2_phys_dist(step,seq)))
+            for step in steps2:
+                lat1 = lat.copy()
+                if np.all(np.abs(np.sum(seq+[step],axis=0))<self.depth+1):
+                    lat1 = self.make_step(lat1, step)
+                    state1 = {'lat': lat1, 'seq': seq + [step]}
+                    # now state = H_{t'}|i>
+                    a = self.state_2_list_entry(state1)
+                    found, j = self.basis.search(a)
+                    if found:
+                        self.row_t2.append(j)
+                        self.col_t2.append(i)
+                        self.data_t2.append((-1*self.dist_2_phys_dist(step,seq)))
 
         self.data_t = np.array(self.data_t)
         self.data_t2 = np.array(self.data_t2)
