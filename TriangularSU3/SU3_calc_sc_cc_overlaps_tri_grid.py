@@ -27,14 +27,14 @@ reload(SU3_helper_sc_cc_overlaps)
 from SU3_helper_sc_cc_overlaps  import *
 
 "decide if you want to calculate honeycomb or triangular lattice overlaps and other relevant parameters here:"
-honeycomb = False
+honeycomb = True
 system = 'SU2Hc_tri_grid' if honeycomb else 'SU3Tri_tri_grid'
 connected = True
 unit_cell = 0
-depth_sc = 3
-depth_cc = 3
-l_max_sc_overlaps = 2
-L=101 # must be odd
+depth_sc = 6
+depth_cc = 6
+l_max_sc_overlaps = 4
+L=121 # must be odd
 
 k_grid = make_triangular_grid_bz(L, grid_size = 2*np.pi/np.sqrt(3) * L/(L-1))
 k_cc = np.array([0,0])
@@ -364,8 +364,7 @@ with tqdm(total=total_iterations) as pbar:
             pbar.update(1)
 Ms_t2_0 = Ms0
 Ms_t2_1 = Ms1 
-np.save("../results/TRI/sc_cc_overlaps/M_t_"+str(system)+"_depth_sc="+str(depth_sc)+"_depth_cc="+str(depth_cc)+"_lmax_sc_overlaps="+str(l_max_sc_overlaps)+"_jperp="+str(j_perp)+"_j="+str(j)+"_t="+str(t)+".npy", (Ms_t2_0, Ms_t2_1))
-print("total overlaps t_prime:", overlap_counter)
+np.save(f"../results/TRI/sc_cc_overlaps/M_t_L={L}_{system}_ccdepth_{depth_cc}_scdepth{depth_sc}_lmaxov_{l_max_sc_overlaps}_j{j}_jperp{j_perp}_t{t}.npy", (Ms_t2_0, Ms_t2_1))
 
 print("1) J_perp overlaps")
 
@@ -478,7 +477,7 @@ with tqdm(total=total_iterations) as pbar:
     Ms_j_1 = Ms1
 
 print("# of non-zero overlaps for Jperp:", overlap_counter_0, overlap_counter_1)
-np.save("../results/TRI/sc_cc_overlaps/M_j_perp_"+str(system)+"_depth_sc="+str(depth_sc)+"_depth_cc="+str(depth_cc)+"_lmax_sc_overlaps="+str(l_max_sc_overlaps)+"_jperp="+str(j_perp)+"_j="+str(j)+"_t="+str(t)+".npy", (Ms_j_0, Ms_j_1))
+np.save(f"../results/TRI/sc_cc_overlaps/M_j_perp_L={L}_{system}_ccdepth_{depth_cc}_scdepth{depth_sc}_lmaxov_{l_max_sc_overlaps}_j{j}_jperp{j_perp}_t{t}.npy", (Ms_j_0, Ms_j_1))
 
 print("Overlap calculations complete.")
 

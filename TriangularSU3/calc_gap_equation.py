@@ -34,9 +34,9 @@ t = 1
 connected = True
 t2=0.2
 
-depth_sc = 4
-depth_cc = 4
-l_max_sc_overlaps = 3
+depth_sc = 6
+depth_cc = 6
+l_max_sc_overlaps = 4
 k_cc = np.array([0,0])
 unit_cell = 1
 
@@ -56,10 +56,8 @@ if calc_overlaps:
     sc_disp = np.zeros([1,len(k_path)])
     sc_disp, _ = lat_sc1.dispersion(k_path, two_D=False, state=1, t=t, t2=0, j=j, j_perp=j_perp)
 
-    print('computed 1D dispersion in {t:.3f}s'.format(t=perf_counter()-t0))
-
-    sc_disp
-    np.save(f'../results/TRI/{system}sc_disp_L{L}_depth{depth_sc}_t{t}_t2{t2}_J{j}_Jperp{j_perp}.npy', sc_disp)
+    print('computed 2D dispersion in {t:.3f}s'.format(t=perf_counter()-t0))
+    np.save(f'../results/TRI/{system}sc_disp_L{L}_depth{depth_sc}_t{t}_t2{0}_J{j}_Jperp{j_perp}.npy', sc_disp) #2D dispersion saved in array of shape (2, N)
 
 
     print("----------------- Calculating eigenstates -----------------")
@@ -467,7 +465,11 @@ else:
     # Ms_t2_0, Ms_t2_1 = np.load(f'../results/TRI/sc_cc_overlaps/M_t_L={L}_{system}_ccdepth_{depth_cc}_scdepth{depth_sc}_lmaxov_{l_max_sc_overlaps}_j{j}_jperp{j_perp}_t{t}.npy', allow_pickle=True)
     Ms_j_0, Ms_j_1 = np.load(f'../results/TRI/Delta_k/M_j_L={L}_{system}_ccdepth_{depth_cc}_scdepth{depth_sc}_lmaxov_{l_max_sc_overlaps}_j{j}_jperp{j_perp}_t{t}.npy', allow_pickle=True)
     Ms_t2_0, Ms_t2_1 = np.load(f'../results/TRI/Delta_k/M_t_L={L}_{system}_ccdepth_{depth_cc}_scdepth{depth_sc}_lmaxov_{l_max_sc_overlaps}_j{j}_jperp{j_perp}_t{t}.npy', allow_pickle=True)
-    sc_disp = np.load(f'../results/TRI/{system}sc_disp_L{L}_depth{depth_sc}_t{t}_t2{0}_J{j}_Jperp{j_perp}.npy', allow_pickle=True)
+    # sc_disp = np.load(f'../results/TRI/{system}sc_disp_L{L}_depth{depth_sc}_t{t}_t2{0}_J{j}_Jperp{j_perp}.npy', allow_pickle=True)
+    print(f'../results/TRI/{system}sc_disp_L{L}_depth{depth_sc}_t{t}_t2{0}_J{j}_Jperp{j_perp}.npy')
+    print('../results/TRI/SU2Hcsc_disp_L81_depth6_t1_t20.2_J0.3_Jperp0.3.npy')
+    sc_disp = np.load(f'../results/TRI/SU2Hcsc_disp_L81_depth6_t1_t20.2_J0.3_Jperp0.3.npy', allow_pickle=True)
+
 sc_disp = 2*sc_disp #for Q=0 the two sc states' dispersion can just be added
 E_min = np.min(sc_disp)
 E_max = np.max(sc_disp)
@@ -537,7 +539,7 @@ def solve_coupled_gaps(eps_k, gamma_0, gamma_1, g, beta, initial_guess=(0.1, 0.1
     return sol[0], sol[1] + 1j*sol[2]
 
 delta1, delta2 = solve_coupled_gaps(epsilon, gamma0, gamma1, g, beta, initial_guess=(1, 1))
-print(f'solution: Delta1 = {delta1}, Delta2 = {delta2}')
+np.save(f'../results/TRI/Delta_k/delta_L={L}_{system}_ccdepth_{depth_cc}_scdepth{depth_sc}_lmaxov_{l_max_sc_overlaps}_j{j}_jperp{j_perp}_t{t}.npy', (delta1, delta2))
 
 print('plotting all solutions for given parameters')
 kx = k_grid[0, :]
@@ -560,13 +562,13 @@ for i, deg in enumerate(phase_degrees):
     # --- Plot Real Part (using coolwarm) ---
     im_abs = axs_flat[idx_real].tripcolor(triang, np.abs(current_Delta_k), 
                                          shading='gouraud', cmap='coolwarm')
-    axs_flat[idx_real].set_title(fr'abs($\Delta_k$) at $\phi={deg}^\circ$')
+    axs_flat[idx_real].set_title(fr'$|\Delta_k|$ for $\phi={deg}^\circ$')
     fig.colorbar(im_abs, ax=axs_flat[idx_real])
     
     # --- Plot Imaginary Part (using twilight) ---
     im_angle = axs_flat[idx_imag].tripcolor(triang, np.angle(current_Delta_k), 
                                          shading='gouraud', cmap='twilight')
-    axs_flat[idx_imag].set_title(fr'angle($\Delta_k$) at $\phi={deg}^\circ$')
+    axs_flat[idx_imag].set_title(fr'$\angle \Delta_k$ for $\phi={deg}^\circ$')
     fig.colorbar(im_angle, ax=axs_flat[idx_imag])
 
 # 3. Clean up axes
@@ -575,8 +577,53 @@ for idx, ax in enumerate(axs_flat):
     if idx % 2 == 0:
         ax.set_ylabel(r'$k_y$')
 
-plt.suptitle(fr'abs\angle $\Delta_k$ for $\mu={c_p}$, $\Delta E={delta_E}$, $t2={t2}$', fontsize=22)
+plt.suptitle(fr'$\Delta_k$ for $\mu={c_p}$, $\Delta E={delta_E}$, $t2={t2}$', fontsize=22)
 plt.tight_layout()
 
 # 4. Save and Show
-plt.savefig(f'../results/figures/Delta_k/{system}_DeltaE{delta_E}_cp{c_p}_beta{beta}_t2={t2}Grid.pdf')
+plt.savefig(f'../results/figures/Delta_k/{system}_DeltaE{delta_E}_cp{c_p}_beta{beta}_t2={t2}_lsc={depth_sc}_lcc={depth_cc}_lscmax={l_max_sc_overlaps}_L={L}.pdf')
+
+print('Plotting only absolute values of Delta_k')
+
+phase_degrees = [0, 120, 240, 60, 180, 300]
+
+fig, axs = plt.subplots(2, 3, figsize=(20, 12))
+axs_flat = axs.flatten()  # Flatten the 2x3 grid array
+
+for i, deg in enumerate(phase_degrees):
+    delta1, delta2 = solve_coupled_gaps(
+        epsilon, gamma0, gamma1, g, beta, 
+        initial_guess=(Delta*1, Delta*np.exp(1j*deg/60*np.pi/3))
+    )
+    print(f'delta1 = {delta1}, delta2 = {delta2} for phase {deg} degrees')
+    current_Delta_k = delta1 * gamma0 + delta2 * gamma1
+    
+    ax = axs_flat[i]
+    ax.set_aspect('equal')    
+
+    im_abs = ax.tripcolor(
+        triang, 
+        np.abs(current_Delta_k), 
+        shading='gouraud', 
+        cmap='coolwarm'
+    )
+
+    # Use ax.figure to ensure it attaches to the exact parent figure instance
+    cbar = ax.figure.colorbar(im_abs, ax=ax)
+    cbar.ax.tick_params(labelsize=18)
+    plt.setp(cbar.ax.get_yticklabels(), fontsize=22)
+    
+    ax.set_title(fr'$|\Delta_k|$ for $\phi_\Delta={deg}^\circ$', size=22)
+
+    # Axis labels
+    ax.set_xlabel(r'$k_x$', size=22)
+    if i % 3 == 0:  # Only label y-axis on the leftmost column
+        ax.set_ylabel(r'$k_y$', size=22)
+
+fig.suptitle(fr'$\Delta_k$ for $\mu={c_p}$, $\Delta E={delta_E}$, $J_\perp={j_perp}$, $t2={t2}$', fontsize=22)
+fig.tight_layout()
+
+# 4. Save and Show
+plt.savefig(f'../results/figures/Delta_k/{system}_abs_DeltaE{delta_E}_cp{c_p}_beta{beta}_t2={t2}_lsc={depth_sc}_lcc={depth_cc}_lscmax={l_max_sc_overlaps}_L={L}.pdf')
+
+print('------------- finished plotting -------------')

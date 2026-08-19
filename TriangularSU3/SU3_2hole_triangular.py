@@ -70,7 +70,9 @@ class StringBasis:
         self.col_t=[]   #matrix elemnt now saved here not in matrix_el() function, why?
         self.row_t=[]
         self.data_t=None
-        self.data_t=None
+        self.col_t2 = []
+        self.row_t2 = []
+        self.data_t2 = None
         self.col_j=[]
         self.row_j=[]
         self.data_j=[]
@@ -171,6 +173,7 @@ class StringBasis:
         return innit
     
     def dist_2_uc_dist0(self,dist,seq):   # horizontal unit cell
+
         dist1 = dist.copy()
         if self.honeycomb:
             x = np.sum(np.array(dist1))
@@ -562,16 +565,34 @@ class StringBasis:
             #print(f'state {i}: jdiag={jdiag_sum}')
             diag = (jx_sum + jy_sum + jdiag_sum)/2
             
-            # remove contributions from links adjacent to one of the holes
-            for n in range(2):
-                xh = hole_pos[n]
-                for move in [[1,0], [-1,0], [0,1], [0,-1], [1,1], [-1,-1]]:
-                    xh2 = xh + np.array(move)
-                    if lat[xh2[0],xh2[1]] == lat[xh[0],xh[1]] and (xh2 != hole_pos[0]).any():   #second condlition avoids double counting if holes are adjacent
-                        diag -= 1/2 
-                        # print(f'hole {n}, move {move}')
-                        # print(diag)
-            #print(f'rep: {i}, j_diag: {diag}')
+            # # remove contributions from links adjacent to one of the holes
+            # for n in range(2):
+            #     xh = hole_pos[n]
+            #     for move in [[1,0], [-1,0], [0,1], [0,-1], [1,1], [-1,-1]]:
+            #         xh2 = xh + np.array(move)
+            #         if lat[xh2[0],xh2[1]] == lat[xh[0],xh[1]] and (xh2 != hole_pos[0]).any():   #second condlition avoids double counting if holes are adjacent
+            #             diag -= 1/2 
+
+
+            # # remove contributions from links adjacent to one of the holes
+            phys_dist = np.zeros(2)
+            hole_dist = hole_pos[1] - hole_pos[0]
+            phys_dist[0], phys_dist[1] = np.sqrt(3)/2*hole_dist[0], hole_dist[1] - 1/2*hole_dist[0]
+            abs_dist = np.sqrt(np.sum(phys_dist**2))
+
+            if np.isclose((abs_dist), 1, atol=1e-6): #if the holes sit on neighboring sites
+                if self.honeycomb:
+                    diag = 0.5 * 5
+                else:
+                    diag = 0.5 * 11
+                self.data_V.append(1)
+                self.row_V.append(i)
+                self.col_V.append(i)
+            else:
+                if self.honeycomb:
+                    diag = 0.5 * 6
+                else:
+                    diag = 0.5 * 12
             
             self.data_j.append(diag)
             self.row_j.append(i)
@@ -675,7 +696,6 @@ class StringBasis:
                     lat1 = lat.copy()
                     hole_pos1 = hole_pos.copy()                     
                     lat1, hole_pos1 = self.make_step(lat1, hole_pos1, step)
-                    y = hole_pos1[1]
                     state1 = {'lat': lat1, 'hole_pos': hole_pos1, 'seq': seq + [step]}
                     y = hole_pos1[1]
                         # now state = H_{t}|i>
@@ -719,7 +739,7 @@ class StringBasis:
         if bool(t2) and len(self.data_t2) > 0:
             data_1 = np.array([x[0] for x in self.data_t2])
             data_2 = np.array([x[1] for x in self.data_t2])
-            data_t = t2 * p ** data_1 * np.exp(1j * (data_2[:,0]*k[0]+data_2[:,1]*k[1]))            
+            data_t2 = t2 * p ** data_1 * np.exp(1j * (data_2[:,0]*k[0]+data_2[:,1]*k[1]))            
             row_t2 = self.row_t2
             col_t2 = self.col_t2
         else:
@@ -741,17 +761,18 @@ class StringBasis:
         # print('len data_j_perp compute_H: ', len(data_j_perp))
         # print('len col_j_perp compute_H: ', len(col_j_perp))
         # print('len row_j_perp compute_H: ', len(row_j_perp))
+        # print(f'lengh of V data: {len(self.data_V)}')
         
-        N = 1  # normalization factor
+        N = 1  # normalization factor for SU(3) t-J model
         # if self.honeycomb == self.honeycomb:
         if self.honeycomb == False:
-            data = np.concatenate((data_t, np.conj(data_t), data_t2, np.conj(data_t2), N*j * np.array(self.data_j), N * np.array(data_j_perp)), axis=0)
-            row = np.array(self.row_t + self.col_t + row_t2 + col_t2 + self.row_j + row_j_perp)
-            col = np.array(self.col_t + self.row_t + col_t2 + row_t2 + self.col_j + col_j_perp)
+            data = np.concatenate((data_t, np.conj(data_t), data_t2, np.conj(data_t2), N*j * np.array(self.data_j), N * np.array(data_j_perp), V * np.array(self.data_V)), axis=0)
+            row = np.array(self.row_t + self.col_t + row_t2 + col_t2 + self.row_j + row_j_perp + self.row_V)
+            col = np.array(self.col_t + self.row_t + col_t2 + row_t2 + self.col_j + col_j_perp + self.col_V)
         else:  
-            data = np.concatenate((data_t, data_t2, j * np.array(self.data_j), np.array(data_j_perp)), axis=0)
-            row = np.array(self.row_t + row_t2 + col_t2 + self.row_j + row_j_perp) 
-            col = np.array(self.col_t + col_t2 + row_t2 + self.col_j + col_j_perp)
+            data = np.concatenate((data_t, data_t2, j * np.array(self.data_j), np.array(data_j_perp), V * np.array(self.data_V)), axis=0)
+            row = np.array(self.row_t + row_t2 + self.row_j + row_j_perp + self.row_V) 
+            col = np.array(self.col_t + col_t2 + self.col_j + col_j_perp + self.col_V)
 
         self.data = data
         # print(f"Length of data array: {len(data)}")
@@ -932,7 +953,7 @@ class StringBasis:
             E=np.empty(k_x.shape)
             for i in range(k_x.shape[0]):
                 for l in range(k_x.shape[1]):
-                    self.compute_H([k_x[i,l],k_y[i,l]], t=t, t2=t2, j=j, j_perp=j_perp, p=p) 
+                    self.compute_H([k_x[i,l],k_y[i,l]], t=t, t2=t2, j=j, j_perp=j_perp, V=V, p=p) 
                     E[i,l]=self.eigenval(state)
 
         else:

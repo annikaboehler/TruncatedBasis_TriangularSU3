@@ -31,9 +31,9 @@ honeycomb = False
 system = 'SU2Hc' if honeycomb else 'SU3Tri'
 connected = True
 unit_cell = 0
-depth_sc = 3
-depth_cc = 3
-l_max_sc_overlaps = 2
+depth_sc = 4
+depth_cc = 4
+l_max_sc_overlaps = 3
 L=100
 
 size = 1.2*np.pi 

@@ -48,6 +48,71 @@ def make_triangular_grid_bz(L,grid_size=None): #used
     k_grid = np.einsum('ij, jk -> ik', g, k_grid)
     return k_grid
 
+def get_path_indices_aligned(k_grid, path_nodes, tolerance=1e-3):
+    """
+    Shifts path_nodes so the first node aligns with a k_grid point, 
+    then finds ordered indices of k_grid points along the shifted path.
+    
+    Parameters:
+    -----------
+    k_grid : ndarray (2, N)
+        The grid of k-points.
+    path_nodes : list of ndarrays or ndarray (M, 2)
+        List of symmetry points, e.g., [Gamma, K, Kp, Gamma].
+    tolerance : float
+        Distance threshold to capture points near the line.
+        
+    Returns:
+    --------
+    path_indices : ndarray
+        Ordered indices of the k-grid points following the path.
+    shifted_path_nodes : list of ndarrays
+        The adjusted path nodes matching the grid.
+    """
+    path_nodes = [np.array(node, dtype=float) for node in path_nodes]
+    
+    # 1. Find distance vector 'd' from first path node to closest k_grid point
+    first_node = path_nodes[0]
+    distances_to_first = np.linalg.norm(k_grid - first_node[:, np.newaxis], axis=0)
+    closest_idx = np.argmin(distances_to_first)
+    
+    # Shift vector: d = (closest grid point) - (first path node)
+    d = k_grid[:, closest_idx] - first_node
+    
+    # 2. Shift all path nodes by d
+    shifted_path_nodes = [node + d for node in path_nodes]
+    
+    # 3. Collect indices along the shifted segments
+    path_indices = []
+
+    for i in range(len(shifted_path_nodes) - 1):
+        A = shifted_path_nodes[i]
+        B = shifted_path_nodes[i+1]
+        
+        ba = B - A
+        ba_norm_sq = np.dot(ba, ba)
+        
+        pa = k_grid - A[:, np.newaxis]
+        
+        t = np.dot(ba, pa) / ba_norm_sq
+        
+        closest = A[:, np.newaxis] + np.clip(t, 0, 1) * ba[:, np.newaxis]
+        dist = np.linalg.norm(k_grid - closest, axis=0)
+        
+        mask = (dist < tolerance) & (t >= -1e-8) & (t <= 1 + 1e-8)
+        segment_idx = np.where(mask)[0]
+        
+        sorted_idx = segment_idx[np.argsort(t[segment_idx])]
+        
+        # Deduplicate junction points
+        if i > 0 and len(path_indices) > 0 and len(sorted_idx) > 0:
+            if sorted_idx[0] == path_indices[-1]:
+                sorted_idx = sorted_idx[1:]
+        
+        path_indices.extend(sorted_idx.tolist())
+
+    return np.array(path_indices)
+
 def sum_ind(i, j, Lx, Ly=0):
     if Ly==0:
         L = Lx
