@@ -582,17 +582,17 @@ class StringBasis:
 
             if np.isclose((abs_dist), 1, atol=1e-6): #if the holes sit on neighboring sites
                 if self.honeycomb:
-                    diag = 0.5 * 5
+                    diag += 0.5 * 5
                 else:
-                    diag = 0.5 * 11
+                    diag += 0.5 * 11
                 self.data_V.append(1)
                 self.row_V.append(i)
                 self.col_V.append(i)
             else:
                 if self.honeycomb:
-                    diag = 0.5 * 6
+                    diag += 0.5 * 6
                 else:
-                    diag = 0.5 * 12
+                    diag += 0.5 * 12
             
             self.data_j.append(diag)
             self.row_j.append(i)
@@ -1095,7 +1095,6 @@ class StringBasis:
             (1,2):-1, (1,0):-2,
             (2,0):-1, (2,1):1}[(x, y)]
 
-    
     def f_honeycomb(self,x,y): 
         return x-y
     
@@ -1172,59 +1171,51 @@ class StringBasis:
         R = csr_matrix((data, (row, col)), shape=(len(self.representatives), len(self.representatives)))
         return R
     
-    def g(self,x):
-        return (x+1)-1 #g(0)=0, g(1)=1, g(2)=-1
-
-    
-    def build_rot_matrix(self,k,p=-1): #change unit cell, st. green is in the middle
+    def build_rot_matrix(self, k, p=-1):
         row = []
         col = []
         data = []
-        C3 = np.array([[np.cos(2/3*np.pi),-np.sin(2/3*np.pi)],[np.sin(2/3*np.pi),np.cos(2/3*np.pi)]])
-        k = C3@k
+        
+        # 1. Match the clockwise rotation (-120 deg) of rot_state_120
+        theta = -2 * np.pi / 3
+        C3 = np.array([[np.cos(theta), -np.sin(theta)],
+                    [np.sin(theta),  np.cos(theta)]])
+        k_rot = C3 @ k
 
         for n, state in enumerate(self.representatives):
-        # for n in [2]: 
-        #     state = self.representatives[n]
-            #print(f'n={n}')
-            x,_ = self.find_hole_sublattice(state['seq'])
+            x, y = self.find_hole_sublattice(state['seq'])
             rot_state = self.rot_state_120(state) 
             found, m = self.basis.search(self.state_2_list_entry(rot_state))
+            
             if found:
-                phase = 0
-                # print()
-                # print(n)
-                # print(f'k={k}')
-                # print(f'C3@k={k}')
-                a = np.sqrt(3)
-                if self.big_unit_cell:
-                    # phase = self.f(x,y)*a
-                    phase = self.g(x)*a
-                    #print(f'delta_phase={phase}')
+                phase_rot = 0
+                if self.honeycomb:
+                    # Sublattice shift phase when central hole is on sublattice 1
+                    if x == 1:
+                        dist = 1/2 * np.array([np.sqrt(3), -3])
+                        if self.unit_cell == 0:
+                            dist = dist
+                        elif self.unit_cell == 1:
+                            dist = C3 @ dist
+                        elif self.unit_cell == 2:
+                            dist = C3 @ C3 @ dist
+                        phase_rot = dist[0] * k_rot[0] +dist[1] * k_rot[1]
+                        
                 (rep, _, m3) = self.is_representative[m]
-                # print(f'm3={m3}')
                 row.append(m3)
                 col.append(n)
+                
                 if rep:
-                    data.append(np.exp(-1j*(phase*k[0])))
-                    # print(f'x-phase={-phase}')
-                    # print()
+                    data.append(np.exp(-1j * phase_rot))
                 else:
+                    # Exchange phase with a single fermionic parity sign 'p'
                     b = self.dist_2_phys_dist(rot_state['hole_pos'][1] - rot_state['hole_pos'][0], rot_state['seq'])
-                    #print(f'delta_swap={b}')
-                    data.append(p * np.exp(-1j*(b[0]*k[0]+b[1]*k[1] + phase*k[0])))
-                    # print(f'total phase={-b-[phase,0]}*C3*k+pi')
-                    # print()
-                    # print(f'x-phase: {-b[0]-phase}')
-                    # print(f'y-phase: {-b[1]}')
-                    # print(f'phase*C3k: {-(b[0]*k[0]+b[1]*k[1] + phase*k[0] + np.pi)}')
-                    # print(f'data: {np.exp(-1j*(b[0]*k[0]+b[1]*k[1] + phase*k[0] + np.pi))}')
-
+                    phase_exchange = b[0] * k_rot[0] + b[1] * k_rot[1]
+                    data.append(p * np.exp(-1j * (phase_rot + phase_exchange)))
             else:
-                print(f'Couldrt find rot_state for state {n}')
+                print(f'Could not find rot_state for state {n}')
 
-        R = csr_matrix((data, (row, col)), shape=(len(self.representatives), len(self.representatives)))
-        return R
+        return csr_matrix((data, (row, col)), shape=(len(self.representatives), len(self.representatives)), dtype=complex)
 
     def test_c3_symmetry(self):
         for state in self.representatives:
