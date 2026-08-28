@@ -1,0 +1,5 @@
+<img width="450" alt="single_hole_pos1" src="https://github.com/user-attachments/assets/96b80e98-f588-4c6b-8d04-874070119876" />
+
+<br><br>
+
+**Geometric String Formation of a Magnetic Polaron.** In strongly correlated Mott insulators, a doped hole fractionalizes into two constituent partons: a mobile, charge-carrying *chargon* (white circle) and a stationary, color-carrying *spinon* (striped red circle). As the chargon hops through the $SU(3)$ antiferromagnetic background (traced by blue arrows), it displaces flavor charges and leaves behind a "string" of frustrated bonds (yellow highlights). Within the geometric string formalism, this trace acts as a linear confining potential that binds the chargon and spinon together into a mesonic quasiparticle. Because the energy of these states scales linearly with the string length, long strings are highly suppressed at low energies. The numerical code leverages this physical property to construct an explicit, *truncated Krylov basis*—restricting the Hilbert space to a maximum string length ($l_{max}$) to efficiently compute the low-energy spectrum without the state space growing exponentially.
