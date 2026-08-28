@@ -1,0 +1,7 @@
+# Ignore the entire results directory
+results/
+
+# Python cache & OS files
+__pycache__/
+*.pyc
+.DS_Store
