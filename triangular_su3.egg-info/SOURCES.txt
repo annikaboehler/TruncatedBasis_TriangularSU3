@@ -1,0 +1,7 @@
+plot_dispersions.py
+plot_rot_overlaps.py
+pyproject.toml
+triangular_su3.egg-info/PKG-INFO
+triangular_su3.egg-info/SOURCES.txt
+triangular_su3.egg-info/dependency_links.txt
+triangular_su3.egg-info/top_level.txt

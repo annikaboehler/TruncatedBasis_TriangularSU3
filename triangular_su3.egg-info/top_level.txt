@@ -1,0 +1,9 @@
+SU3_1hole_triangular
+SU3_calc_sc
+SU3_dispersions
+SU3_helper_functions
+calc_gap_equ
+dispersions_lmax_sweep
+plot_dispersion_Linus
+plot_dispersions
+plot_rot_overlaps

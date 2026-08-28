@@ -32,7 +32,7 @@ j = 0.3
 j_perp = 0.3
 t = 1
 connected = True
-t2=0.2
+t2=0
 
 depth_sc = 6
 depth_cc = 6
@@ -41,7 +41,7 @@ k_cc = np.array([0,0])
 unit_cell = 1
 
 # gap parameters
-beta = 2000
+beta = 10**6
 c_p = 0.05 #percentage of the sc bandwidth to set the chemical potential, should be between 0 and 1
 delta_E = -0.1 #should be negative and not smaller then the sc bandwidth 
 

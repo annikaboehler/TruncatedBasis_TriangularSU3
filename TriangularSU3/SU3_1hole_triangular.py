@@ -667,8 +667,8 @@ class StringBasis:
             phase = 0
             if self.honeycomb and self.big_unit_cell:
                 if len(state['seq'])%2 == 1:
-                    phase = k[0]*np.sqrt(3)
-                    phase = 1/2*(k[0] * np.sqrt(3) + k[1]*3)
+                    # phase = k[0]*np.sqrt(3)
+                    # phase = 1/2*(k[0] * np.sqrt(3) + k[1]*3)
                     phase = -1/2*(k[0] * np.sqrt(3) + k[1]*3)
             if not self.honeycomb and self.big_unit_cell:
                 x = self.find_hole_sublattice(seq)

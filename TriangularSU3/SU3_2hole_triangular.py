@@ -1040,9 +1040,7 @@ class StringBasis:
         i = hole_pos[1][0]-self.depth-1
         j = hole_pos[1][1]-self.depth-1
         rot_hole = np.array([j-i+self.depth+1, -i+self.depth+1])
-        # print(hole_pos)
-        # print(rot_hole)
-        # print()
+        
 
         ## rotate seq
         rot_seq = []
@@ -1052,7 +1050,199 @@ class StringBasis:
 
         rot_state = {'lat': rot_lat, 'hole_pos': [hole_pos[0], rot_hole], 'seq': rot_seq}
         return rot_state
+
+    def mirror_y_state(self, state):
+        """Mirrors a state across the physical x-axis (sigma_y: rx -> -rx, ry -> ry)."""
+        lat = state['lat']
+        hole_pos = state['hole_pos']
+        seq = state['seq']
+
+        sublattice = self.find_sublattice(state)
+        lat1 = (lat - sublattice) % 3
+        lat1[hole_pos[0][0], hole_pos[0][1]] = 0
+        lat1[hole_pos[1][0], hole_pos[1][1]] = 0
+
+        ## 1. Mirror flipped spins on the lattice
+        row, col = np.nonzero(lat1)
+        val = lat[row, col]
+
+        # Shift to center-relative coordinates
+        i_rel = row - (self.depth + 1)
+        j_rel = col - (self.depth + 1)
+
+        # Apply (i, j) -> (-i, j - i)
+        mir_i = -i_rel + (self.depth + 1)
+        mir_j = (j_rel - i_rel) + (self.depth + 1)
+
+        mir_lat = sublattice.copy()
+        mir_lat[mir_i, mir_j] = val
+
+        ## 2. Mirror moving hole position
+        i_h = hole_pos[1][0] - (self.depth + 1)
+        j_h = hole_pos[1][1] - (self.depth + 1)
+        mir_hole = np.array([-i_h + (self.depth + 1), (j_h - i_h) + (self.depth + 1)], dtype=int)
+
+        ## 3. Mirror move sequence
+        mir_seq = []
+        for move in seq:
+            move_mir = np.array([move[0], -move[1], move[2] - move[1]], dtype=int)
+            mir_seq.append(move_mir)
+
+        return {'lat': mir_lat, 'hole_pos': [hole_pos[0], mir_hole], 'seq': mir_seq}
+
+    def mirror_state(self, state, plane=0):
+        """
+        Computes the mirror reflection across plane n in {0, 1, 2}:
+          plane=0: sigma_0 (y-axis reflection)
+          plane=1: sigma_1 (rotated by 120 deg) = C3 @ sigma_0
+          plane=2: sigma_2 (rotated by 240 deg) = C3^2 @ sigma_0
+        """
+        # First apply y-mirror
+        mir_state = self.mirror_y_state(state)
+
+        # Apply C3 rotations to access the other two mirror planes
+        for _ in range(plane % 3):
+            mir_state = self.rot_state_120(mir_state) #this convention leaves the uc = plane invariant under mirror symmetry
+
+        return mir_state
     
+    # def build_mirror_matrix(self, k, plane=0, p=-1):
+    #     """
+    #     Builds the representation matrix M(k) for reflection symmetry in the representative basis.
+        
+    #     Parameters:
+    #       k     : 2D momentum array [k_x, k_y]
+    #       plane : 0 for sigma_y (y-axis reflection)
+    #               1 for sigma_1 (rotated by 120 deg)
+    #               2 for sigma_2 (rotated by 240 deg)
+    #       p     : exchange parity (-1 for fermions, +1 for bosons)
+    #     """
+    #     row = []
+    #     col = []
+    #     data = []
+
+    #     # 1. Momentum transformation matrix for plane 0 (sigma_y)
+    #     M_sigma_y = np.array([[-1.0,  0.0],
+    #                           [ 0.0,  1.0]])
+
+    #     # Clockwise C3 rotation matrix (-120 deg)
+    #     theta = -2.0 * np.pi / 3.0
+    #     C3 = np.array([[np.cos(theta), -np.sin(theta)],
+    #                    [np.sin(theta),  np.cos(theta)]])
+
+    #     # Full reflection matrix: sigma_plane = (C3)^plane @ sigma_y
+    #     M_plane = np.linalg.matrix_power(C3, plane % 3) @ M_sigma_y
+    #     k_mir = M_plane @ k
+    #     # k_mir = k
+    #     for n, state in enumerate(self.representatives):
+    #         x, y = self.find_hole_sublattice(state['seq'])
+            
+    #         # Apply mirror reflection across the chosen plane
+    #         mir_state = self.mirror_state(state, plane=plane)
+            
+    #         found, m = self.basis.search(self.state_2_list_entry(mir_state))
+    #         if found:
+    #             phase_mir = 0.0
+                
+    #             # Geometric sublattice phase for planes 1 and 2 (from C3 rotations)
+    #             if self.honeycomb:
+    #                 if x == 1:
+    #                     if plane == self.unit_cell:
+    #                         phase_mir = 0.0
+    #                     elif plane == 0 and self.unit_cell == 1:
+    #                         phase_mir = np.sqrt(3) * k_mir[0]
+    #                     elif plane == 0 and self.unit_cell == 2:
+    #                         phase_mir = -np.sqrt(3) * k_mir[0]
+    #                     elif plane == 1 and self.unit_cell == 0:
+    #                         phase_mir = 0.5 * (np.sqrt(3) * k_mir[0] + 3.0 * k_mir[1])
+    #                     elif plane == 1 and self.unit_cell == 2:
+    #                         phase_mir = -0.5 * (np.sqrt(3) * k_mir[0] + 3.0 * k_mir[1])
+    #                     elif plane == 2 and self.unit_cell == 0:
+    #                         phase_mir = 0.5 * (-np.sqrt(3) * k_mir[0] + 3.0 * k_mir[1])
+    #                     elif plane == 2 and self.unit_cell == 1:
+    #                         phase_mir = -0.5 * (-np.sqrt(3) * k_mir[0] + 3.0 * k_mir[1])
+
+    #             (rep, _, m3) = self.is_representative[m]
+    #             row.append(m3)
+    #             col.append(n)
+
+    #             if rep:
+    #                 data.append(np.exp(-1j * phase_mir))
+    #             else:
+    #                 # Particle exchange phase with single parity sign 'p'
+    #                 k_mirror = M_plane @ k
+    #                 b = self.dist_2_phys_dist(mir_state['hole_pos'][1] - mir_state['hole_pos'][0], mir_state['seq'])
+    #                 phase_exchange = b[0] * k_mirror[0] + b[1] * k_mirror[1]
+    #                 data.append(p * np.exp(-1j * (phase_mir + phase_exchange)))
+    #         else:
+    #             print(f"Could not find mirror state for representative {n}")
+
+    #     return csr_matrix((data, (row, col)), shape=(len(self.representatives), len(self.representatives)), dtype=complex)
+
+    def build_mirror_matrix(self, k, plane=0, p=-1):
+        """
+        Builds the representation matrix M(k) for reflection symmetry in the representative basis.
+        
+        Parameters:
+        k     : 2D momentum array [k_x, k_y]
+        plane : 0 for sigma_y (y-axis reflection)
+                1 for sigma_1 (rotated by 120 deg)
+                2 for sigma_2 (rotated by 240 deg)
+        p     : exchange parity (-1 for fermions, +1 for bosons)
+        """
+        row = []
+        col = []
+        data = []
+
+        # 1. Momentum transformation matrix for plane 0 (sigma_y: x -> -x, y -> y)
+        M_sigma_y = np.array([[-1.0,  0.0],
+                            [ 0.0,  1.0]])
+
+        # Clockwise C3 rotation matrix (-120 deg)
+        theta = -2.0 * np.pi / 3.0
+        C3 = np.array([[np.cos(theta), -np.sin(theta)],
+                    [np.sin(theta),  np.cos(theta)]])
+
+        # Full reflection matrix: sigma_plane = (C3)^plane @ sigma_y
+        M_plane = np.linalg.matrix_power(C3, plane % 3) @ M_sigma_y
+        k_mir = M_plane @ k
+
+        # Base intra-unit-cell vector delta_0 for unit_cell=0 (from A at (0,0) to B at (0,1))
+        delta_0 = np.array([0.0, 1.0])
+
+        for n, state in enumerate(self.representatives):
+            x, y = self.find_hole_sublattice(state['seq'])
+            
+            # Apply mirror reflection across the chosen plane
+            mir_state = self.mirror_state(state, plane=plane)
+            
+            found, m = self.basis.search(self.state_2_list_entry(mir_state))
+            if found:
+                phase_mir = 0.0
+                
+                # Sublattice origin shift phase when central hole is on sublattice 1
+                if self.honeycomb and self.big_unit_cell:
+                    if x == 1:
+                        delta = np.linalg.matrix_power(C3, self.unit_cell % 3) @ delta_0
+                        dist = M_plane @ delta - delta
+                        phase_mir = dist[0] * k_mir[0] + dist[1] * k_mir[1]
+
+                (rep, _, m3) = self.is_representative[m]
+                row.append(m3)
+                col.append(n)
+
+                if rep:
+                    data.append(np.exp(-1j * phase_mir))
+                else:
+                    # Particle exchange phase with single parity sign 'p'
+                    b = self.dist_2_phys_dist(mir_state['hole_pos'][1] - mir_state['hole_pos'][0], mir_state['seq'])
+                    phase_exchange = b[0] * k_mir[0] + b[1] * k_mir[1]
+                    data.append(p * np.exp(-1j * (phase_mir + phase_exchange)))
+            else:
+                print(f"Could not find mirror state for representative {n}")
+
+        return csr_matrix((data, (row, col)), shape=(len(self.representatives), len(self.representatives)), dtype=complex)
+
     def rot_trial_state(self, m3, k, p=-1): #p is parity under particle exchange
         '''Computes unnormalized trial state with given rotational C3 eigenvalue m3 and momentum k'''
         assert len(self.representatives) > 0

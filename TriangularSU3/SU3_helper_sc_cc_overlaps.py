@@ -6,6 +6,7 @@ from scipy.sparse import csr_matrix
 from time import perf_counter
 import copy
 import cmath
+from scipy.spatial import cKDTree
 from importlib import reload
 import SU3_2hole_triangular
 reload(SU3_2hole_triangular)  
@@ -47,6 +48,54 @@ def make_triangular_grid_bz(L,grid_size=None): #used
     k_grid = np.stack([k_x, k_y])
     k_grid = np.einsum('ij, jk -> ik', g, k_grid)
     return k_grid
+
+def project_to_1bz(k_vec):
+    """
+    Projects a 2D vector k (or array of vectors) into the 1st Brillouin Zone.
+    
+    Parameters:
+        k_vec: np.ndarray of shape (2,) or (N, 2)
+    Returns:
+        k_1bz: np.ndarray of same shape as k_vec inside the 1BZ
+    """
+    k_arr = np.atleast_2d(k_vec)
+
+    # Define reciprocal basis vectors
+    b1 = (2 * np.pi / 3) * np.array([np.sqrt(3), 1.0])
+    b2 = (2 * np.pi / 3) * np.array([np.sqrt(3), -1.0])
+    B = np.column_stack([b1, b2])      # 2x2 matrix transforming (c1, c2) -> (kx, ky)
+    B_inv = np.linalg.inv(B)           # Matrix transforming (kx, ky) -> (c1, c2)
+    
+    # 1. Convert to fractional reciprocal coordinates
+    c = k_arr @ B_inv.T  # Shape: (N, 2)
+    
+    # 2. Get initial integer guess
+    n_guess = np.round(c)
+    
+    # 3. Test 3x3 local neighborhood of reciprocal lattice vectors
+    offsets = np.array([
+        [dx, dy] 
+        for dx in [-1, 0, 1] 
+        for dy in [-1, 0, 1]
+    ])  # Shape: (9, 2)
+    
+    # Generate candidate lattice vectors G = (n + offset) @ B.T
+    # Candidates shape: (N, 9, 2)
+    n_candidates = n_guess[:, np.newaxis, :] + offsets[np.newaxis, :, :]
+    G_candidates = n_candidates @ B.T  # Shape: (N, 9, 2)
+    
+    # Calculate distance ||k - G|| for each candidate
+    k_expanded = k_arr[:, np.newaxis, :]  # Shape: (N, 1, 2)
+    diffs = k_expanded - G_candidates     # Shape: (N, 9, 2)
+    dists_sq = np.sum(diffs**2, axis=-1)   # Shape: (N, 9)
+    
+    # Pick G that minimizes distance to k
+    min_idx = np.argmin(dists_sq, axis=1) # Shape: (N,)
+    
+    # Select best diff (k - G_closest)
+    k_1bz = diffs[np.arange(len(k_arr)), min_idx]
+    
+    return k_1bz.reshape(k_vec.shape)
 
 def get_path_indices_aligned(k_grid, path_nodes, tolerance=1e-3):
     """
@@ -112,6 +161,152 @@ def get_path_indices_aligned(k_grid, path_nodes, tolerance=1e-3):
         path_indices.extend(sorted_idx.tolist())
 
     return np.array(path_indices)
+
+def rotate_momentum_and_M(k_grid, M, angle_rad=2*np.pi/3):
+    """
+    Rotates the momentum grid and reorders/maps the values of array M 
+    corresponding to a 120 degree rotation (or any angle_rad).
+    
+    Parameters:
+    -----------
+    k_grid : np.ndarray
+        Array of shape (2, N) containing (k_x, k_y) coordinates.
+    M : np.ndarray
+        Array of shape (N,) containing complex matrix element values.
+    angle_rad : float
+        Rotation angle in radians. Default is 2*pi/3 (120 degrees).
+        
+    Returns:
+    --------
+    k_grid_rotated : np.ndarray
+        The physically rotated momentum grid of shape (2, N).
+    M_rotated : np.ndarray
+        The rotated/reindexed M array of shape (N,).
+    """
+    # 1. Define the 2D rotation matrix for 120 degrees
+    cos_a, sin_a = np.cos(angle_rad), np.sin(angle_rad)
+    R_120 = np.array([
+        [cos_a, -sin_a],
+        [sin_a,  cos_a]
+    ])
+    
+    # 2. Rotate the coordinates of k_grid: R * k
+    # k_grid shape is (2, N), so R @ k_grid rotates every (k_x, k_y) column
+    k_rotated = R_120 @ k_grid
+    
+    # 3. Build a KDTree of the original grid to find nearest-neighbor indices
+    tree = cKDTree(k_grid.T)  # k_grid.T has shape (N, 2)
+    
+    # Query nearest original points for each physically rotated point
+    distances, mapped_indices = tree.query(k_rotated.T, k=1)
+    
+    # Optional check: Ensure the point mapping is valid within numerical tolerance
+    if np.max(distances) > 1e-5:
+        print(f"Warning: Maximum distance to nearest grid point is {np.max(distances):.2e}."
+              " The grid might not be fully closed under 120-degree rotation.")
+        
+    # 4. Map the entries of M to the rotated grid positions
+    M_rotated = M[mapped_indices]
+    
+    return k_rotated, M_rotated
+
+def mirror_momentum_and_M(k_grid, M, mirror_index=0, tol=1e-5):
+    """
+    Applies one of the three C3-symmetric mirror reflections to a momentum grid
+    and reorders/maps the corresponding values of array M.
+    
+    The symmetry group C_3v has 3 reflection axes at angles theta = 0, pi/3, 2pi/3
+    relative to the k_x axis (corresponding to mirror normals at 0, 120, and 240 degrees).
+    
+    Parameters:
+    -----------
+    k_grid : np.ndarray
+        Array of shape (2, N) containing (k_x, k_y) coordinates.
+    M : np.ndarray
+        Array of shape (N,) containing complex matrix element values.
+    mirror_index : int
+        0 : Reflection across k_x axis (kx, ky) -> (kx, -ky) [theta = 0]
+        1 : Reflection across axis at 60 deg (pi/3)
+        2 : Reflection across axis at 120 deg (2*pi/3)
+    tol : float
+        Tolerance for KDTree nearest-neighbor verification.
+        
+    Returns:
+    --------
+    k_mirrored : np.ndarray
+        The physically reflected momentum grid of shape (2, N).
+    M_mirrored : np.ndarray
+        The reflected/reindexed M array of shape (N,).
+    """
+    # 1. Reflection angle of the mirror axis
+    # mirror_index in {0, 1, 2} corresponds to theta in {0, pi/3, 2pi/3}
+    theta = mirror_index * (np.pi / 3)
+    
+    # 2. General 2D Householder reflection matrix across axis at angle theta
+    cos_2t = np.cos(2 * theta)
+    sin_2t = np.sin(2 * theta)
+    
+    sigma = np.array([
+        [ cos_2t,  sin_2t],
+        [ sin_2t, -cos_2t]
+    ])
+    
+    # 3. Apply reflection to grid: sigma @ k_grid
+    k_mirrored = sigma @ k_grid
+    
+    # 4. Build a KDTree of the original grid to find nearest-neighbor indices
+    tree = cKDTree(k_grid.T)  # k_grid.T has shape (N, 2)
+    distances, mapped_indices = tree.query(k_mirrored.T, k=1)
+    
+    # Check grid closure under mirror symmetry
+    max_dist = np.max(distances)
+    if max_dist > tol:
+        print(f"Warning: Maximum distance to nearest grid point is {max_dist:.2e}."
+              f" The grid might not be fully closed under mirror #{mirror_index}.")
+        
+    # 5. Map the values of M to the new mirrored positions
+    M_mirrored = M[mapped_indices]
+    
+    return k_mirrored, M_mirrored
+
+def invert_momentum_and_M(k_grid, M, tol=1e-5):
+    """
+    Applies 2D inversion symmetry (kx, ky) -> (-kx, -ky) to a momentum grid
+    and reorders/maps the corresponding values of array M.
+    
+    Parameters:
+    -----------
+    k_grid : np.ndarray
+        Array of shape (2, N) containing (k_x, k_y) coordinates.
+    M : np.ndarray
+        Array of shape (N,) containing complex matrix element values.
+    tol : float
+        Tolerance for KDTree nearest-neighbor verification.
+        
+    Returns:
+    --------
+    k_inverted : np.ndarray
+        The physically inverted momentum grid of shape (2, N).
+    M_inverted : np.ndarray
+        The inverted/reindexed M array of shape (N,).
+    """
+    # 1. Inversion operation: -k
+    k_inverted = -k_grid
+    
+    # 2. Build KDTree of original grid to map indices
+    tree = cKDTree(k_grid.T)  # k_grid.T has shape (N, 2)
+    distances, mapped_indices = tree.query(k_inverted.T, k=1)
+    
+    # 3. Check grid closure under inversion
+    max_dist = np.max(distances)
+    if max_dist > tol:
+        print(f"Warning: Maximum distance to nearest grid point is {max_dist:.2e}."
+              " The grid might not be fully closed under inversion symmetry.")
+        
+    # 4. Map the entries of M to the inverted grid positions
+    M_inverted = M[mapped_indices]
+    
+    return k_inverted, M_inverted
 
 def sum_ind(i, j, Lx, Ly=0):
     if Ly==0:
